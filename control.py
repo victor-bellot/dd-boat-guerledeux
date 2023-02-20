@@ -183,6 +183,13 @@ class Control:
         while (time.time() - t0) < duration:
             t0loop = time.time()
 
+            coord_boat = self.gpsm.coord
+
+            if self.gpsm.updated:
+                pos_boat = coord_to_pos(coord_boat)
+                x, y = pos_boat.flatten()
+                self.traj.write("%f;%f\n" % (x, y))
+
             psi = self.get_current_cap()
             delta_phi = sawtooth(psi_bar * (np.pi / 180) - psi)
             print("DELTA PHI: ", int(delta_phi * (180 / np.pi)))
