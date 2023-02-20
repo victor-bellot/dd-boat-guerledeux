@@ -37,18 +37,21 @@ def delta_odo(odo1, odo0):
         dodo += 65536
     return dodo
 
+
 def normalize(u):
     n = np.linalg.norm(u)
-    u = u / n if n > 0 else 0
+    return u / n if n > 0 else 0
+
 
 def dot(a, b):
     return np.sum(a * b)
+
 
 def sawtooth(x):
     return (x + np.pi) % (2 * np.pi) - np.pi
 
 
-def rotuv(u,v): #returns rotation with minimal angle  such that  v = R * u
+def rotuv(u, v):  # returns rotation with minimal angle  such that  v = R * u
     u = normalize(u)
     v = normalize(v)
     c = dot(u, v)
