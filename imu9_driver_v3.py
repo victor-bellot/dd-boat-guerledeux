@@ -8,19 +8,8 @@ import i2creal as i2c  # currently only real I2C on ddboats (no simulated I2C)
 
 
 class Imu9IO:
-    def __init__(self, calibration_file_name='calibration'):
-        measurements = np.load(calibration_file_name + '.npy')
-        xn, xs, xw, xu = (measurements[k] for k in range(4))
-        self.b = (-1 / 2) * (xn + xs)
-
-        yn = np.array([[np.cos(I)], [0], [-np.sin(I)]])
-        yw = np.array([[0], [-np.cos(I)], [-np.sin(I)]])
-        yu = np.array([[-np.sin(I)], [0], [np.cos(I)]])
-        Y = np.hstack([yn, yw, yu])
-
-        X = np.hstack((xn + self.b, xw + self.b, xu + self.b))
-        A = X @ np.linalg.inv(Y)
-        self.A_1 = np.linalg.inv(A)
+    def __init__(self):
+        self.A_1, self.b = np.eye(3), np.zeros(shape=(3, 1))
 
         self.__bus_nb = 1  # 1 on DDBoat, 2 on DartV2
         self.__addr_mg = 0x1e  # mag sensor
@@ -74,6 +63,20 @@ class Imu9IO:
         # IF_INC = 1 (automatically increment address register)
         self.__dev_i2c_ag.write(0x12, [0x04])
 
+    def load_calibration(self, calibration_file_name='calibration.npy'):
+        measurements = np.load(calibration_file_name)
+        xn, xs, xw, xu = (measurements[k] for k in range(4))
+        self.b = (-1 / 2) * (xn + xs)
+
+        yn = np.array([[np.cos(I)], [0], [-np.sin(I)]])
+        yw = np.array([[0], [-np.cos(I)], [-np.sin(I)]])
+        yu = np.array([[-np.sin(I)], [0], [np.cos(I)]])
+        Y = np.hstack([yn, yw, yu])
+
+        X = np.hstack((xn + self.b, xw + self.b, xu + self.b))
+        A = X @ np.linalg.inv(Y)
+        self.A_1 = np.linalg.inv(A)
+
     def setup_accel_filter(self, mode):
         if mode == 0:
             self.__dev_i2c_ag.write(0x17, [0x00])
@@ -94,7 +97,7 @@ class Imu9IO:
         iy = self.cmpl2(v[2], v[3])
         iz = self.cmpl2(v[4], v[5])
         self.__mag_raw = [ix, iy, iz]
-        return self.__mag_raw
+        return np.array(self.__mag_raw).reshape(3, 1)
 
     def read_gyro_raw(self):
         # OUTX_L_G (0x22)
@@ -103,7 +106,7 @@ class Imu9IO:
         iy = self.cmpl2(v[2], v[3])
         iz = self.cmpl2(v[4], v[5])
         self.__gyro_raw = [ix, iy, iz]
-        return self.__gyro_raw
+        return np.array(self.__gyro_raw).reshape(3, 1)
 
     def read_accel_raw(self):
         # OUTX_L_XL (0x28)
@@ -112,7 +115,7 @@ class Imu9IO:
         iy = self.cmpl2(v[2], v[3])
         iz = self.cmpl2(v[4], v[5])
         self.__accel_raw = [ix, iy, iz]
-        return self.__accel_raw
+        return np.array(self.__accel_raw).reshape(3, 1)
 
     def cmpl2(self, lsByte, msByte):
         i = lsByte + (msByte << 8)
@@ -121,7 +124,7 @@ class Imu9IO:
         return i
 
     def correction_mag(self):
-        x = np.array(self.read_mag_raw()).reshape(-1, 1)
+        x = self.read_mag_raw()
         y = self.A_1 @ (x + self.b)
         return y
 
@@ -132,11 +135,11 @@ class Imu9IO:
         phi = np.arcsin(dot(a1, np.array([[0], [1], [0]])))
         theta = -np.arcsin(dot(a1, np.array([[1], [0], [0]])))
 
-        Rh = rotuv(a1, np.array([[0], [0], [1]]))
+        Rh = rotuv(a1, np.array([[0], [0], [-1]]))
         yh = Rh @ y1
         psi = -np.arctan2(yh[1, 0], yh[0, 0])
 
-        return phi, theta, psi
+        return np.array([phi, theta, psi]).T
 
     def cap(self):
         return self.get_euler_angles()[2]
