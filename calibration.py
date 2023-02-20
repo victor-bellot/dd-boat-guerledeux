@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
     if n < 0:
         while True:
-            print(imu.correction_mag().flatten(), imu.orientation() * (180 / np.pi))
+            print(imu.get_euler_angles())
             time.sleep(0.1)
     else:
         file_name = 'calibration.npy'
@@ -35,5 +35,5 @@ if __name__ == "__main__":
                     measurements[:, k] = np.array(imu.read_mag_raw())
                     time.sleep(0.01)
                 res[i] = np.median(measurements, axis=1, keepdims=True)
-                print("%s = (%f, %f, %f)" % (label, *list(res[i].flatten())))
-            np.save(f, res)
+                print("%s = (%f, %f, %f)" % (label,) + tuple(res[i].flatten()))
+            np.save(file_name, res)

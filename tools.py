@@ -9,6 +9,7 @@ coordinates = {'ponton': [48.199024, -3.014790],
                'plage': [48.199807, -3.014803]}
 
 rho = 110e3  # 6366376  # to check
+I = 63.7 / 180 * np.pi  # earth magnetic field angle
 
 
 def data_to_str(data):

@@ -6,25 +6,22 @@ import i2creal as i2c  # currently only real I2C on ddboats (no simulated I2C)
 # LIS3DML 0x1e  (mag sensor)
 # LSM6    0x6b  (accelero - gyro)
 
-I = 63.7 / 180 * np.pi
-
-measurements = np.load('calibration.npy')
-xn, xs, xw, xu = (measurements[k] for k in range(4))
-
-yn = np.array([[np.cos(I)], [0], [-np.sin(I)]])
-yw = np.array([[0], [-np.cos(I)], [-np.sin(I)]])
-yu = np.array([[-np.sin(I)], [0], [np.cos(I)]])
-Y = np.hstack([yn, yw, yu])
-
-b = (-1 / 2) * (xn + xs)
-X = np.hstack((xn + b, xw + b, xu + b))
-
-A = X @ np.linalg.inv(Y)
-A_1 = np.linalg.inv(A)
-
 
 class Imu9IO:
-    def __init__(self):
+    def __init__(self, calibration_file_name='calibration'):
+        measurements = np.load(calibration_file_name + '.npy')
+        xn, xs, xw, xu = (measurements[k] for k in range(4))
+        self.b = (-1 / 2) * (xn + xs)
+
+        yn = np.array([[np.cos(I)], [0], [-np.sin(I)]])
+        yw = np.array([[0], [-np.cos(I)], [-np.sin(I)]])
+        yu = np.array([[-np.sin(I)], [0], [np.cos(I)]])
+        Y = np.hstack([yn, yw, yu])
+
+        X = np.hstack((xn + self.b, xw + self.b, xu + self.b))
+        A = X @ np.linalg.inv(Y)
+        self.A_1 = np.linalg.inv(A)
+
         self.__bus_nb = 1  # 1 on DDBoat, 2 on DartV2
         self.__addr_mg = 0x1e  # mag sensor
         self.__addr_ag = 0x6b  # accelero - gyro
@@ -125,14 +122,13 @@ class Imu9IO:
 
     def correction_mag(self):
         x = np.array(self.read_mag_raw()).reshape(-1, 1)
-        y = A_1 @ (x + b)
+        y = self.A_1 @ (x + self.b)
         return y
 
     def get_euler_angles(self):
-        x1 = self.read_mag_raw()
         a1 = normalize(self.read_accel_raw())
+        y1 = normalize(self.correction_mag())
 
-        y1 = normalize(A_1 @ (x1 + b))
         phi = np.arcsin(dot(a1, np.array([[0], [1], [0]])))
         theta = -np.arcsin(dot(a1, np.array([[1], [0], [0]])))
 
