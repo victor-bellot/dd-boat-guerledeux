@@ -1,6 +1,5 @@
 import numpy as np
 from gps_driver_v2 import GpsIO
-from scipy.linalg import expm
 
 data_keys = ['time', 'd_psi', 'rpm_l', 'rpm_r', 'rpm_lb', 'rpm_rb', 'th_l', 'th_r']
 
@@ -53,22 +52,33 @@ def sawtooth(x):
     return (x + np.pi) % (2 * np.pi) - np.pi
 
 
-def adjoint(w):
-    w1,w2,w3= w[0,0], w[1,0], w[2,0]
-    return np.array([[0,-w3,w2] , [w3,0,-w1] , [-w2,w1,0]])
+def adj(w):
+    wx, wy, wz = w.flatten()
+    return np.array([[0, -wz, wy], [wz, 0, -wx], [-wy, wx, 0]])
 
-def Exp(w): return expm(adjoint(w))
 
-def rotuv_alt(u,v):
-    w=np.cross(u,v)
-    return Exp(np.arcos(dot(u.T,v)*w/normalize(w)))
+def expm(M, order=6):
+    acc = np.eye(3)
+    Mk = np.eye(3)
+    scl = 1
 
-def rotuv(u, v):  # returns rotation with minimal angle  such that  v = R * u
-    u = normalize(u)
-    v = normalize(v)
-    c = dot(u, v)
-    A = v @ u.T - u @ v.T
-    return np.eye(3, 3) + A + (1 / (1 + c)) * A @ A
+    for k in range(1, order+1):
+        Mk = Mk @ M
+        scl = (1/k) * scl
+        acc = acc + scl * Mk
+
+    return acc
+
+
+def expw(w): return expm(adj(w))
+
+
+def rot_uv(u, v):  # returns rotation with minimal angle  such that  v = R * u
+    u = normalize(u).flatten()
+    v = normalize(v).flatten()
+
+    w = np.cross(u, v)
+    return expw(np.arccos(dot(u, v)) * w)
 
 
 def cvt_gll_ddmm_2_dd(st):
@@ -160,3 +170,12 @@ class Line:
     def get_psi(self):
         fx, fy = self.get_direction().flatten()
         return np.arctan2(-fx, fy)
+
+
+if __name__ == '__main__':
+    from scipy.linalg import expm as scipy_expm
+
+    for x in np.linspace(-1, +1, 20):
+        for y in np.linspace(-1, +1, 20):
+            w = np.array([[x, y, 0]]).T
+            print(np.abs(expw(w) - scipy_expm(adj(w))))

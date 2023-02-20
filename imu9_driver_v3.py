@@ -132,10 +132,10 @@ class Imu9IO:
         a1 = normalize(self.read_accel_raw())
         y1 = normalize(self.correction_mag())
 
-        phi = np.arcsin(dot(a1, np.array([[0], [1], [0]])))
-        theta = -np.arcsin(dot(a1, np.array([[1], [0], [0]])))
+        phi = np.arcsin(a1[1, 0])
+        theta = np.arcsin(a1[0, 0])
 
-        Rh = rotuv(a1, np.array([[0], [0], [-1]]))
+        Rh = rot_uv(a1, np.array([[0], [0], [-1]]))
         yh = Rh @ y1
         psi = -np.arctan2(yh[1, 0], yh[0, 0])
 
@@ -149,5 +149,5 @@ if __name__ == "__main__":
     imu = Imu9IO()
 
     for i in range(200):
-        print(imu.read_mag_raw(), imu.read_accel_raw(), imu.read_gyro_raw())
-        time.sleep(0.01)
+        print(imu.read_accel_raw().flatten())
+        time.sleep(0.1)
