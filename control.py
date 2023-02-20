@@ -339,6 +339,16 @@ if __name__ == '__main__':
         p = (p_input == 1)
 
         ctr.test_regulation_rpm(d, rpm_spd=s, proportion=p)
+
+    elif mt == 'lundi17':
+        d_input = input("Side duration: ")
+        d = math.inf if d_input == '' else int(d_input)
+
+        s_input = input("Boat RPM speed: ")
+        s = 3000 if s_input == '' else int(s_input)
+
+        ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('W'))
+        ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('N'))
     
     else:
         d_input = input("Mission duration: ")
