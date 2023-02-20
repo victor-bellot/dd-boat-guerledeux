@@ -3,7 +3,7 @@ import time
 import numpy as np
 from imu9_driver_v3 import Imu9IO
 
-labels = ['x1', 'x_1', 'x2', 'x3']
+labels = ['xn', 'xs', 'xw', 'xu']
 
 
 def get_time():
