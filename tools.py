@@ -1,5 +1,6 @@
 import numpy as np
 from gps_driver_v2 import GpsIO
+from scipy.linalg import expm
 
 data_keys = ['time', 'd_psi', 'rpm_l', 'rpm_r', 'rpm_lb', 'rpm_rb', 'th_l', 'th_r']
 
@@ -51,6 +52,16 @@ def dot(a, b):
 def sawtooth(x):
     return (x + np.pi) % (2 * np.pi) - np.pi
 
+
+def adjoint(w):
+    w1,w2,w3= w[0,0], w[1,0], w[2,0]
+    return np.array([[0,-w3,w2] , [w3,0,-w1] , [-w2,w1,0]])
+
+def Exp(w): return expm(adjoint(w))
+
+def rotuv_alt(u,v):
+    w=np.cross(u,v)
+    return Exp(np.arcos(dot(u.T,v)*w/normalize(w)))
 
 def rotuv(u, v):  # returns rotation with minimal angle  such that  v = R * u
     u = normalize(u)
