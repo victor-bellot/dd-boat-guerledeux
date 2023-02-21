@@ -142,7 +142,7 @@ class Control:
         # rpm_bar += add_rpm
 
     def follow_psi(self, duration, psi_bar, speed_rpm):  # psi_bar is given in degrees!
-        self.log.write("duration: %i ; psi_bar: %s ; spd: %i\n" % (duration, psi_bar, speed_rpm))
+        self.log.write("\nduration: %i ; psi_bar: %s ; spd: %i\n" % (duration, psi_bar, speed_rpm))
 
         self.reset()
         t0 = time.time()
@@ -157,14 +157,14 @@ class Control:
                 self.traj.write("%f;%f\n" % (x, y))
 
             psi = self.get_current_cap()
-            delta_phi = sawtooth(psi_bar * (np.pi / 180) - psi)
-            print("DELTA PHI: ", int(delta_phi * (180 / np.pi)))
+            delta_psi = sawtooth(psi_bar * (np.pi / 180) - psi)
+            print("CURRENT PSI: ", int(psi * (180 / np.pi)))
 
-            rpm_left_bar, rpm_right_bar = self.leo_cap_and_speed(delta_phi, speed_rpm)
+            rpm_left_bar, rpm_right_bar = self.leo_cap_and_speed(delta_psi, speed_rpm)
             rpm_left, rpm_right = self.regulation_rpm(rpm_left_bar, rpm_right_bar)
 
             temp_left, temp_right = self.tpr.read_temp()
-            data = [(t0loop - t0) * 1000, delta_phi * (180 / np.pi), rpm_left, rpm_right,
+            data = [(t0loop - t0) * 1000, delta_psi * (180 / np.pi), rpm_left, rpm_right,
                     rpm_left_bar, rpm_right_bar, temp_left, temp_right]
             information = data_to_str(data)
             self.log.write(information)
@@ -177,7 +177,7 @@ class Control:
         self.ard.send_arduino_cmd_motor(0, 0)
 
     def follow_line(self, duration_max, line, speed_rpm):
-        self.log.write("duration_max: %i ; a: %s ; b: %s ; spd: %i\n" %
+        self.log.write("\nduration_max: %i ; a: %s ; b: %s ; spd: %i\n" %
                        (duration_max, line.name0, line.name1, speed_rpm))
 
         self.reset()
@@ -205,7 +205,7 @@ class Control:
 
             psi = self.get_current_cap()
             delta_psi = sawtooth(psi_bar - psi)
-            # print("DELTA PSI: ", int(delta_psi * (180 / np.pi)))
+            print("CURRENT PSI: ", int(psi * (180 / np.pi)))
 
             rpm_left_bar, rpm_right_bar = self.leo_cap_and_speed(delta_psi, speed_rpm)
             rpm_left, rpm_right = self.regulation_rpm(rpm_left_bar, rpm_right_bar)
