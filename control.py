@@ -29,7 +29,7 @@ class Control:
 
         self.cst = {'left': {'kp': 0.01, 'ki': 0.01},
                     'right': {'kp': 0.01, 'ki': 0.01},
-                    'phi': {'kp': (3/4) / np.pi, 'ki': 1e-2 / np.pi},
+                    'phi': {'kp': (3 / 4) / np.pi, 'ki': 1e-2 / np.pi},
                     'line': {'kd': 150, 'kn': 1},
                     }
 
@@ -134,7 +134,7 @@ class Control:
 
         # print('RPM BAR:', rpm_left_bar, rpm_right_bar)
         return rpm_left_bar, rpm_right_bar
-    
+
     def regulation_speed(self, v_bar, v):
         err = v_bar - v
         d_err = abs(self.err_old - err) / self.dt
@@ -171,7 +171,7 @@ class Control:
             information = data_to_str(data)
             self.log.write(information)
 
-            print("Time left: ", self.dt - (time.time() - t0loop))
+            # print("Time left: ", self.dt - (time.time() - t0loop))
             while time.time() - t0loop < self.dt:
                 self.gpsm.update_coord()
                 time.sleep(1e-3)
@@ -219,7 +219,7 @@ class Control:
 
             rpm_left_bar, rpm_right_bar = self.leo_cap_and_speed(delta_psi, speed_rpm)
             rpm_left, rpm_right = self.regulation_rpm(rpm_left_bar, rpm_right_bar)
-    
+
             temp_left, temp_right = self.tpr.read_temp()
             data = [(t0loop - t0) * 1000, delta_psi * (180 / np.pi), rpm_left, rpm_right,
                     rpm_left_bar, rpm_right_bar, temp_left, temp_right, pos_boat]

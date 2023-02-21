@@ -150,7 +150,7 @@ class Imu9IO:
 
     def correction_acc(self):
         lst_acc = []
-        for i in range(32):
+        for _ in range(32):
             lst_acc.append(self.read_accel_raw())
         x = np.median(np.array(lst_acc), axis=0)
         
@@ -166,8 +166,7 @@ class Imu9IO:
         phi = np.arcsin(a1[1, 0])
         theta = np.arcsin(a1[0, 0])
 
-        # Rh = rot_uv(a1, grav)
-        Rh = np.eye(3)
+        Rh = rot_uv(a1, grav)
 
         mhx, mhy, mhz = (Rh @ y1).flatten()
         psi = -np.arctan2(mhy, mhx)

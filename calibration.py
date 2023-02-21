@@ -29,6 +29,7 @@ if __name__ == "__main__":
         while True:
             print(imu.get_euler_angles() * (180 / np.pi))
             time.sleep(0.2)
+
     else:
         with open(file_name, 'wb') as f:
             save = np.empty((2, 5, 3, 1))
