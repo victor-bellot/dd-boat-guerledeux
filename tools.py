@@ -3,9 +3,10 @@ from gps_driver_v2 import GpsIO
 
 data_keys = ['time', 'd_psi', 'rpm_l', 'rpm_r', 'rpm_lb', 'rpm_rb', 'th_l', 'th_r']
 
-coordinates = {'ponton': [48.199024, -3.014790],
-               'nord': [48.199817, -3.015603],
-               'ouest': [48.199038, -3.015807],
+coordinates = {'ponton': [48.198943, -3.014750],
+               'nord': [48.199508, -3.015295],
+               'ouest': [48.199184, -3.015283],
+               'est': [48.199202, -3.015000],
                'plage': [48.199807, -3.014803]}
 
 rho = 110e3  # 6366376  # to check
