@@ -150,7 +150,7 @@ class Imu9IO:
 
     def correction_acc(self):
         lst_acc = []
-        for i in range(64):
+        for i in range(32):
             lst_acc.append(self.read_accel_raw())
         x = np.median(np.array(lst_acc), axis=0)
         
