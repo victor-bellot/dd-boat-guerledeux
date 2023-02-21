@@ -1,5 +1,4 @@
 import time
-import math
 from tools import *
 from imu9_driver_v3 import Imu9IO
 from tc74_driver_v2 import TempTC74IO
@@ -37,6 +36,9 @@ class Control:
         self.step_max = 50
         self.u_max = 100
         self.rpm_max = 4000
+
+        self.exit_attempt_count = 3  # number of attempt before exiting
+        self.distance_to_buoy = 5  # distance in meters from buoy to stop
 
         self.ei_left, self.ei_right, self.ei_psi = 0, 0, 0
         self.err_old = 0
@@ -172,7 +174,7 @@ class Control:
             # print("Time left: ", self.dt - (time.time() - t0loop))
             while time.time() - t0loop < self.dt:
                 self.gpsm.update_coord()
-                time.sleep(0.001)
+                time.sleep(1e-3)
 
         self.ard.send_arduino_cmd_motor(0, 0)
 
@@ -183,21 +185,29 @@ class Control:
         self.reset()
         psi_bar = line.get_psi()
         t0 = time.time()
-        cnt = 0
+        exit_cnt = 0
+
         while (time.time() - t0) < duration_max:  # TO ADD : ending conditions
             t0loop = time.time()
 
-            # condition d'arrêt : distance à la bouée d'arrivée
+            # ENDING conditions:
+            # - distance to buoy
+            # - reach semi-plan
             coord_boat = self.gpsm.coord
             pos_boat = coord_to_pos(coord_boat)
+
             dist = np.linalg.norm(line.pos1 - pos_boat)
-            # print(dist)
-            if dist <= 5:
-                cnt += 1
-                if cnt > 5:
+            proj = dot(line.pos1 - line.pos0, line.pos1 - pos_boat)
+            if dist <= self.distance_to_buoy or proj < 0:
+                exit_cnt += 1
+                if exit_cnt >= self.exit_attempt_count:
+                    if dist <= self.distance_to_buoy:
+                        print('STOP: distance to buoy less than %fm.' % self.distance_to_buoy)
+                    else:
+                        print('STOP: reach semi-plan.')
                     break
             else:
-                cnt = 0
+                exit_cnt = 0
 
             temp = self.line_to_psi_bar(line)
             psi_bar = temp if temp else psi_bar
@@ -219,7 +229,7 @@ class Control:
             # print("Time left: ", self.dt - (time.time() - t0loop))
             while time.time() - t0loop < self.dt:
                 self.gpsm.update_coord()
-                time.sleep(0.01)
+                time.sleep(1e-3)
 
         self.ard.send_arduino_cmd_motor(0, 0)
 
@@ -238,8 +248,8 @@ if __name__ == '__main__':
             b = input("Ending point: ")
             my_line = Line(a, b)
 
-            d_input = input("Mission max duration: ")
-            d = math.inf if d_input == '' else int(d_input)
+            d_input = input("Mission max duration [s]: ")
+            d = infinity if d_input == '' else int(d_input)
 
             s_input = input("Boat RPM speed: ")
             s = 3000 if s_input == '' else int(s_input)
@@ -247,24 +257,19 @@ if __name__ == '__main__':
             ctr.follow_line(d, my_line, speed_rpm=s)
 
         elif mt == 'triangle':
-            # d_input = input("Test duration: ")
-            # d = math.inf if d_input == '' else int(d_input)
-            d = 200
+            d = infinity  # no time limit
+            s = 3000  # RPM speed
 
-            # s_input = input("Boat RPM speed: ")
-            # s = 3000 if s_input == '' else int(s_input)
-            s = 3000
-
-            line1 = Line('ponton', 'ouest')
-            line2 = Line('ouest', 'nord')
-            line3 = Line('nord', 'ponton')
+            line1 = Line('est', 'nord')
+            line2 = Line('nord', 'ouest')
+            line3 = Line('ouest', 'est')
             ctr.follow_line(d, line1, speed_rpm=s)
             ctr.follow_line(d, line2, speed_rpm=s)
             ctr.follow_line(d, line3, speed_rpm=s)
 
         elif mt == 'square':
-            d_input = input("Side duration: ")
-            d = math.inf if d_input == '' else int(d_input)
+            d_input = input("Side duration [s]: ")
+            d = infinity if d_input == '' else int(d_input)
 
             s_input = input("Boat RPM speed: ")
             s = 3000 if s_input == '' else int(s_input)
@@ -275,8 +280,8 @@ if __name__ == '__main__':
             ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('N'))
 
         elif mt == 'test':
-            d_input = input("Element duration: ")
-            d = math.inf if d_input == '' else int(d_input)
+            d_input = input("Element duration [s]: ")
+            d = infinity if d_input == '' else int(d_input)
 
             s_input = input("Boat RPM speed: ")
             s = 3000 if s_input == '' else int(s_input)
@@ -285,10 +290,10 @@ if __name__ == '__main__':
             ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('N'))
 
         else:
-            d_input = input("Mission duration: ")
-            d = math.inf if d_input == '' else int(d_input)
+            d_input = input("Mission duration [s]: ")
+            d = infinity if d_input == '' else int(d_input)
 
-            p_input = input("Psi bar: ")
+            p_input = input("Psi bar [°]: ")
             p = 0.0 if p_input == '' else int(p_input)
 
             s_input = input("Boat RPM speed: ")

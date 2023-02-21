@@ -26,6 +26,7 @@ if __name__ == '__main__':
     """
     Scatter trajectories
     """
+    mission_name = 'second'
 
     for name, coord in coordinates.items():
         if name != 'plage':
@@ -34,7 +35,7 @@ if __name__ == '__main__':
 
     x = []
     y = []
-    f = open("traj_files/traj_first.txt", 'r')
+    f = open("traj_files/traj_%s.txt" % mission_name, 'r')
     for line in f.readlines()[20:]:
         xs, ys = line.split(';')
         x.append(float(xs))

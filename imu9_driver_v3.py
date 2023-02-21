@@ -162,7 +162,8 @@ class Imu9IO:
         phi = np.arcsin(a1[1, 0])
         theta = np.arcsin(a1[0, 0])
 
-        Rh = rot_uv(a1, grav)
+        # Rh = rot_uv(a1, grav)
+        Rh = np.eye(3)
 
         mhx, mhy, mhz = (Rh @ y1).flatten()
         psi = -np.arctan2(mhy, mhx)
@@ -174,19 +175,13 @@ class Imu9IO:
 
 
 if __name__ == "__main__":
-    # cal = np.load('third.npy')
-
-    # mag = np.array([-1880.0, -3712.0, 47.0]).reshape(1, 3, 1)
-    # acc = np.array([-1276.5, 3908.5, -301.5]).reshape(1, 3, 1)
-    # add = np.stack((mag, acc), axis=0)
-    # new_cal = np.hstack((cal, add))
-    # np.save('third.npy', new_cal)
-
     imu = Imu9IO()
-    imu.load_calibration('third.npy')
+    imu.load_calibration()
 
-    print(imu.trans_acc['A_1'], imu.trans_acc['b'])
+    t0 = time.time()
 
-    # for i in range(200):
-    #     print(imu.read_accel_raw().flatten())
-    #     time.sleep(0.1)
+    for i in range(200):
+        print(imu.read_accel_raw().flatten())
+        time.sleep(1e-3)
+
+    print(time.time() - t0)

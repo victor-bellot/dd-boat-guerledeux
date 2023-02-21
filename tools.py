@@ -9,6 +9,7 @@ coordinates = {'ponton': [48.198943, -3.014750],
                'est': [48.199202, -3.015000],
                'plage': [48.199807, -3.014803]}
 
+infinity = int(1e6)  # maximum mission duration in seconds
 rho = 110e3  # 6366376  # to check
 I = 63.7 / 180 * np.pi  # earth magnetic field angle
 
