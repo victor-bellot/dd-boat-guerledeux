@@ -73,12 +73,14 @@ def expm(M, order=6):
 def expw(w): return expm(adj(w))
 
 
-def rot_uv(u, v):  # returns rotation with minimal angle  such that  v = R * u
-    u = normalize(u).flatten()
-    v = normalize(v).flatten()
+def rot_uv(u, v):  # returns rotation with minimal angle  such that  v=R*u
+    u = normalize(u)
+    v = normalize(v)
 
-    w = np.cross(u, v)
-    return expw(np.arccos(dot(u, v)) * w)
+    c = dot(u, v)
+    A = v @ u.T - u @ v.T
+
+    return np.eye(3, 3) + A + (1 / (1 + c)) * A @ A
 
 
 def cvt_gll_ddmm_2_dd(st):
@@ -173,9 +175,4 @@ class Line:
 
 
 if __name__ == '__main__':
-    from scipy.linalg import expm as scipy_expm
-
-    for x in np.linspace(-1, +1, 20):
-        for y in np.linspace(-1, +1, 20):
-            w = np.array([[x, y, 0]]).T
-            print(np.abs(expw(w) - scipy_expm(adj(w))))
+    pass

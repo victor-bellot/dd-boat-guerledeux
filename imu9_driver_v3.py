@@ -9,7 +9,8 @@ import i2creal as i2c  # currently only real I2C on ddboats (no simulated I2C)
 
 class Imu9IO:
     def __init__(self):
-        self.A_1, self.b = np.eye(3), np.zeros(shape=(3, 1))
+        self.trans_mag = {'A_1': np.eye(3), 'b': np.zeros(shape=(3, 1))}
+        self.trans_acc = {'A_1': np.eye(3), 'b': np.zeros(shape=(3, 1))}
 
         self.__bus_nb = 1  # 1 on DDBoat, 2 on DartV2
         self.__addr_mg = 0x1e  # mag sensor
@@ -65,17 +66,36 @@ class Imu9IO:
 
     def load_calibration(self, calibration_file_name='calibration.npy'):
         measurements = np.load(calibration_file_name)
-        xn, xs, xw, xu = (measurements[k] for k in range(4))
-        self.b = (-1 / 2) * (xn + xs)
+
+        # COMPASS
+        mag = measurements[0]
+        xn, xs, xw, xu, _ = (mag[k] for k in range(5))
+        b = (-1 / 2) * (xn + xs)
 
         yn = np.array([[np.cos(I)], [0], [-np.sin(I)]])
         yw = np.array([[0], [-np.cos(I)], [-np.sin(I)]])
         yu = np.array([[-np.sin(I)], [0], [np.cos(I)]])
         Y = np.hstack([yn, yw, yu])
 
-        X = np.hstack((xn + self.b, xw + self.b, xu + self.b))
+        X = np.hstack((xn + b, xw + b, xu + b))
         A = X @ np.linalg.inv(Y)
-        self.A_1 = np.linalg.inv(A)
+        self.trans_mag['A_1'] = np.linalg.inv(A)
+        self.trans_mag['b'] = b
+
+        # ACCELEROMETER
+        acc = measurements[1]
+        xz, x_z, _, xx, xy = (acc[k] for k in range(5))
+        b = (-1 / 2) * (xz + x_z)
+
+        yz = np.array([[0], [0], [-1]])
+        yx = np.array([[-1], [0], [0]])
+        yy = np.array([[0], [-1], [0]])
+        Y = np.hstack([yz, yx, yy])
+
+        X = np.hstack((xz + b, xx + b, xy + b))
+        A = X @ np.linalg.inv(Y)
+        self.trans_acc['A_1'] = np.linalg.inv(A)
+        self.trans_acc['b'] = b
 
     def setup_accel_filter(self, mode):
         if mode == 0:
@@ -125,19 +145,27 @@ class Imu9IO:
 
     def correction_mag(self):
         x = self.read_mag_raw()
-        y = self.A_1 @ (x + self.b)
+        y = self.trans_mag['A_1'] @ (x + self.trans_mag['b'])
+        return y
+
+    def correction_acc(self):
+        x = self.read_accel_raw()
+        y = self.trans_acc['A_1'] @ (x + self.trans_acc['b'])
         return y
 
     def get_euler_angles(self):
-        a1 = normalize(self.read_accel_raw())
+        grav = np.array([[0], [0], [-1]])
+
+        a1 = normalize(self.correction_acc())
         y1 = normalize(self.correction_mag())
 
         phi = np.arcsin(a1[1, 0])
         theta = np.arcsin(a1[0, 0])
 
-        Rh = rot_uv(a1, np.array([[0], [0], [-1]]))
-        yh = Rh @ y1
-        psi = -np.arctan2(yh[1, 0], yh[0, 0])
+        Rh = rot_uv(a1, grav)
+
+        mhx, mhy, mhz = (Rh @ y1).flatten()
+        psi = -np.arctan2(mhy, mhx)
 
         return np.array([phi, theta, psi]).T
 
@@ -146,8 +174,19 @@ class Imu9IO:
 
 
 if __name__ == "__main__":
-    imu = Imu9IO()
+    # cal = np.load('third.npy')
 
-    for i in range(200):
-        print(imu.read_accel_raw().flatten())
-        time.sleep(0.1)
+    # mag = np.array([-1880.0, -3712.0, 47.0]).reshape(1, 3, 1)
+    # acc = np.array([-1276.5, 3908.5, -301.5]).reshape(1, 3, 1)
+    # add = np.stack((mag, acc), axis=0)
+    # new_cal = np.hstack((cal, add))
+    # np.save('third.npy', new_cal)
+
+    imu = Imu9IO()
+    imu.load_calibration('third.npy')
+
+    print(imu.trans_acc['A_1'], imu.trans_acc['b'])
+
+    # for i in range(200):
+    #     print(imu.read_accel_raw().flatten())
+    #     time.sleep(0.1)
