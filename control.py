@@ -39,6 +39,7 @@ class Control:
 
         self.el_left, self.el_right = 0, 0
         self.ei_left, self.ei_right, self.ei_psi = 0, 0, 0
+        self.err_old = 0
         self.cmd_left, self.cmd_right = 50, 50
 
     def reset(self, cmd_left_init=50, cmd_right_init=50):
@@ -169,6 +170,15 @@ class Control:
 
         # print('RPM BAR:', rpm_left_bar, rpm_right_bar)
         return rpm_left_bar, rpm_right_bar
+    
+    def regulation_speed(self, v_bar, v):
+        err = v_bar - v
+        d_err = abs(self.err_old - err) / self.dt
+        self.err_old = err
+        add_rpm = self.cst['speed']['kd'] * d_err + self.cst['speed']['kp'] * err
+        return add_rpm
+        # rpm_bar += add_rpm
+
 
     def follow_psi(self, duration, psi_bar, speed_rpm):
         """prend en argument une durée de mission (duration : en seconde), un cap à suivre (psi_bar : angle avec le nord en degrés) et une vitesse de rotation maximale des moteurs (speed_rpm : en rotation par minute);
