@@ -141,7 +141,7 @@ class Imu9IO:
         i = lsByte + (msByte << 8)
         if i >= (1 << 15):
             i = i - (1 << 16)
-        return i
+        return i        
 
     def correction_mag(self):
         x = self.read_mag_raw()
@@ -149,7 +149,11 @@ class Imu9IO:
         return y
 
     def correction_acc(self):
-        x = self.read_accel_raw()
+        lst_acc = []
+        for i in range(64):
+            lst_acc.append(self.read_accel_raw())
+        x = np.median(np.array(lst_acc), axis=0)
+        
         y = self.trans_acc['A_1'] @ (x + self.trans_acc['b'])
         return y
 
