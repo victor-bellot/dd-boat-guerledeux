@@ -161,8 +161,6 @@ class Control:
             psi = self.get_current_cap()
             delta_psi = sawtooth(psi_bar * (np.pi / 180) - psi)
             print("CURRENT PSI: ", int(psi * (180 / np.pi)))
-            acc_filt = self.imu.correction_acc()
-            print("acc : ", acc_filt.flatten())
 
             rpm_left_bar, rpm_right_bar = self.leo_cap_and_speed(delta_psi, speed_rpm)
             rpm_left, rpm_right = self.regulation_rpm(rpm_left_bar, rpm_right_bar)
