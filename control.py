@@ -10,14 +10,17 @@ from encoders_driver_v2 import EncoderIO
 class Control:
     def __init__(self, mission_name, dt=0.5):
         self.mission_name = mission_name
-        self.log = open("log_files/log_%s.txt" % mission_name, 'a')
-        self.traj = open("traj_files/traj_%s.txt" % mission_name, 'a')
+
+        self.log = open("log_files/log_%s.txt" % mission_name, 'a+')
+        self.traj = open("traj_files/traj_%s.txt" % mission_name, 'a+')
 
         self.ard = ArduinoIO()
         self.enc = EncoderIO()
         self.imu = Imu9IO()
         self.tpr = TempTC74IO()
         self.gpsm = GpsManager()
+
+        self.imu.load_calibration()  # load calibration.npy
 
         self.dt = dt
         # set delay between old and new measures : HERE=dt
@@ -44,6 +47,7 @@ class Control:
         self.cmd_left, self.cmd_right = cmd_left_init, cmd_right_init
 
     def close(self):
+        self.ard.send_arduino_cmd_motor(0, 0)
         self.log.close()
         self.traj.close()
 
@@ -57,7 +61,7 @@ class Control:
     def get_current_cap_degree(self):
         return self.get_current_cap() * (180 / np.pi)
 
-    def line_to_phi_bar(self, line):
+    def line_to_psi_bar(self, line):
         coord_boat = self.gpsm.coord
 
         if self.gpsm.updated:
@@ -137,7 +141,7 @@ class Control:
         return add_rpm
         # rpm_bar += add_rpm
 
-    def follow_psi(self, duration, psi_bar, speed_rpm):
+    def follow_psi(self, duration, psi_bar, speed_rpm):  # psi_bar is given in degrees!
         self.log.write("duration: %i ; psi_bar: %s ; spd: %i\n" % (duration, psi_bar, speed_rpm))
 
         self.reset()
@@ -188,14 +192,14 @@ class Control:
             pos_boat = coord_to_pos(coord_boat)
             dist = np.linalg.norm(line.pos1 - pos_boat)
             # print(dist)
-            if dist <= 15:
+            if dist <= 5:
                 cnt += 1
                 if cnt > 5:
                     break
             else:
                 cnt = 0
 
-            temp = self.line_to_phi_bar(line)
+            temp = self.line_to_psi_bar(line)
             psi_bar = temp if temp else psi_bar
             # print("PSI BAR: ", psi_bar * (180 / np.pi))
 
@@ -226,69 +230,71 @@ if __name__ == '__main__':
     mn = input("Mission name: ")
     ctr = Control(mn)
 
-    mt = input("Mission type (psi, square, line, test, triangle): ")
+    try:
+        mt = input("Mission type (psi, square, line, test, triangle): ")
 
-    if mt == 'line':
-        a = input("Starting point: ")
-        b = input("Ending point: ")
-        my_line = Line(a, b)
+        if mt == 'line':
+            a = input("Starting point: ")
+            b = input("Ending point: ")
+            my_line = Line(a, b)
 
-        d_input = input("Mission max duration: ")
-        d = math.inf if d_input == '' else int(d_input)
+            d_input = input("Mission max duration: ")
+            d = math.inf if d_input == '' else int(d_input)
 
-        s_input = input("Boat RPM speed: ")
-        s = 3000 if s_input == '' else int(s_input)
+            s_input = input("Boat RPM speed: ")
+            s = 3000 if s_input == '' else int(s_input)
 
-        ctr.follow_line(d, my_line, speed_rpm=s)
-    
-    elif mt == 'triangle':
-        # d_input = input("Test duration: ")
-        # d = math.inf if d_input == '' else int(d_input)
-        d = 200
+            ctr.follow_line(d, my_line, speed_rpm=s)
 
-        # s_input = input("Boat RPM speed: ")
-        # s = 3000 if s_input == '' else int(s_input)
-        s = 3000
+        elif mt == 'triangle':
+            # d_input = input("Test duration: ")
+            # d = math.inf if d_input == '' else int(d_input)
+            d = 200
 
-        line1 = Line('ponton', 'ouest')
-        line2 = Line('ouest', 'nord')
-        line3 = Line('nord', 'ponton')
-        ctr.follow_line(d, line1, speed_rpm=s)
-        ctr.follow_line(d, line2, speed_rpm=s)
-        ctr.follow_line(d, line3, speed_rpm=s)
+            # s_input = input("Boat RPM speed: ")
+            # s = 3000 if s_input == '' else int(s_input)
+            s = 3000
 
-    elif mt == 'square':
-        d_input = input("Side duration: ")
-        d = math.inf if d_input == '' else int(d_input)
+            line1 = Line('ponton', 'ouest')
+            line2 = Line('ouest', 'nord')
+            line3 = Line('nord', 'ponton')
+            ctr.follow_line(d, line1, speed_rpm=s)
+            ctr.follow_line(d, line2, speed_rpm=s)
+            ctr.follow_line(d, line3, speed_rpm=s)
 
-        s_input = input("Boat RPM speed: ")
-        s = 3000 if s_input == '' else int(s_input)
+        elif mt == 'square':
+            d_input = input("Side duration: ")
+            d = math.inf if d_input == '' else int(d_input)
 
-        ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('N'))
-        ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('W'))
-        ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('S'))
-        ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('N'))
+            s_input = input("Boat RPM speed: ")
+            s = 3000 if s_input == '' else int(s_input)
 
-    elif mt == 'test':
-        d_input = input("Element duration: ")
-        d = math.inf if d_input == '' else int(d_input)
+            ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('N'))
+            ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('W'))
+            ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('S'))
+            ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('N'))
 
-        s_input = input("Boat RPM speed: ")
-        s = 3000 if s_input == '' else int(s_input)
+        elif mt == 'test':
+            d_input = input("Element duration: ")
+            d = math.inf if d_input == '' else int(d_input)
 
-        ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('W'))
-        ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('N'))
-    
-    else:
-        d_input = input("Mission duration: ")
-        d = math.inf if d_input == '' else int(d_input)
+            s_input = input("Boat RPM speed: ")
+            s = 3000 if s_input == '' else int(s_input)
 
-        p_input = input("Psi bar: ")
-        p = 0.0 if p_input == '' else int(p_input)
+            ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('W'))
+            ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('N'))
 
-        s_input = input("Boat RPM speed: ")
-        s = 3000 if s_input == '' else int(s_input)
+        else:
+            d_input = input("Mission duration: ")
+            d = math.inf if d_input == '' else int(d_input)
 
-        ctr.follow_psi(d, speed_rpm=s, psi_bar=p)
+            p_input = input("Psi bar: ")
+            p = 0.0 if p_input == '' else int(p_input)
 
-    ctr.close()
+            s_input = input("Boat RPM speed: ")
+            s = 3000 if s_input == '' else int(s_input)
+
+            ctr.follow_psi(d, speed_rpm=s, psi_bar=p)
+
+    except KeyboardInterrupt:
+        ctr.close()

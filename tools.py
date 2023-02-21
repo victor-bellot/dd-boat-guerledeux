@@ -22,13 +22,13 @@ def data_to_str(data):
 
 def cap_to_psi(cap):
     if cap == 'S':
-        return np.pi
+        return 180
     elif cap == 'W':
-        return np.pi / 2
+        return +90
     elif cap == 'E':
-        return -np.pi / 2
+        return -90
     else:
-        return 0.0
+        return 0
 
 
 def delta_odo(odo1, odo0):
