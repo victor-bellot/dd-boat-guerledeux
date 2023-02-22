@@ -34,8 +34,8 @@ class Control:
                     }
 
         self.step_max = 50
-        self.u_max = 100
-        self.rpm_max = 4000
+        self.u_max = 128
+        self.rpm_max = 5000
 
         self.exit_attempt_count = 3  # number of attempt before exiting
         self.distance_to_buoy = 5  # distance in meters from buoy to stop
@@ -94,6 +94,7 @@ class Control:
         rpm_right = (60. / 8.) * delta_odo(odo_right1, odo_right0) / self.dt
 
         return rpm_left, rpm_right
+        
 
     def regulation_rpm(self, rpm_left_bar, rpm_right_bar):
         rpm_left, rpm_right = self.get_rpm()
@@ -126,6 +127,7 @@ class Control:
         self.ei_psi += delta_psi * self.dt
         e_psi = self.cst['psi']['kp'] * delta_psi + self.cst['psi']['ki'] * self.ei_psi
 
+        rpm_max = min(self.rpm_max, rpm_max)
         if e_psi >= 0:
             rpm_left_bar = rpm_max - e_psi * rpm_max
             rpm_right_bar = rpm_max
@@ -344,6 +346,19 @@ if __name__ == '__main__':
 
         elif mt == 'testRPM':
             ctr.test_rpm()
+        
+        elif mt == 'test_cmd':
+            for u in range(10, 200, 10):
+                ctr.ard.send_arduino_cmd_motor(u, u)
+                t = 0
+                while t < 3:
+                    rpm_left, rpm_right = ctr.get_rpm()
+                    print(u, rpm_left, rpm_right)
+                    time.sleep(0.05)
+                    t += 0.05
+                print('')
+                
+
 
         else: # psi ici
             d_input = input("Mission duration [s]: ")
