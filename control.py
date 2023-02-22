@@ -10,14 +10,12 @@ class Control:
     def __init__(self, mission_name, dt=0.5):
         self.mission_name = mission_name
 
-        self.log = open("log_files/log_%s.txt" % mission_name, 'a+')
-        self.traj = open("traj_files/traj_%s.txt" % mission_name, 'a+')
-
         self.ard = ArduinoIO()
         self.enc = EncoderIO()
         self.imu = Imu9IO()
         self.tpr = TempTC74IO()
         self.gpsm = GpsManager()
+        self.logm = LogManager(mission_name)
 
         self.imu.load_calibration()  # load calibration.npy
 
@@ -51,8 +49,7 @@ class Control:
 
     def close(self):
         self.ard.send_arduino_cmd_motor(0, 0)
-        self.log.close()
-        self.traj.close()
+        self.logm.close()
 
     def change_timing(self, dt):
         self.dt = dt
@@ -69,8 +66,6 @@ class Control:
 
         if self.gpsm.updated:
             pos_boat = coord_to_pos(coord_boat)
-            x, y = pos_boat.flatten()
-            self.traj.write("%f;%f\n" % (x, y))
 
             kd, kn = self.cst['line']['kd'], self.cst['line']['kn']
             force = get_force(line, pos_boat, kd, kn)
@@ -101,12 +96,14 @@ class Control:
         # left motor
         e_left = rpm_left_bar - rpm_left
         self.ei_left += e_left * self.dt
-        step_left = self.cst['left']['kp'] * e_left + self.cst['left']['ki'] * self.ei_left
+        step_left = self.cst['left']['kp'] * e_left + \
+            self.cst['left']['ki'] * self.ei_left
 
         # right motor
         e_right = rpm_right_bar - (-rpm_right)
         self.ei_right += e_right * self.dt
-        step_right = self.cst['right']['kp'] * e_right + self.cst['right']['ki'] * self.ei_right
+        step_right = self.cst['right']['kp'] * e_right + \
+            self.cst['right']['ki'] * self.ei_right
 
         # On seuil la variation en tension
         if abs(step_left) > self.step_max:
@@ -124,7 +121,8 @@ class Control:
 
     def leo_cap_and_speed(self, delta_psi, rpm_max):
         self.ei_psi += delta_psi * self.dt
-        e_psi = self.cst['psi']['kp'] * delta_psi + self.cst['psi']['ki'] * self.ei_psi
+        e_psi = self.cst['psi']['kp'] * delta_psi + \
+            self.cst['psi']['ki'] * self.ei_psi
 
         if e_psi >= 0:
             rpm_left_bar = rpm_max - e_psi * rpm_max
@@ -140,14 +138,17 @@ class Control:
         err = v_bar - v
         d_err = abs(self.err_old - err) / self.dt
         self.err_old = err
-        add_rpm = self.cst['speed']['kd'] * d_err + self.cst['speed']['kp'] * err
+        add_rpm = self.cst['speed']['kd'] * \
+            d_err + self.cst['speed']['kp'] * err
         return add_rpm
         # rpm_bar += add_rpm
 
     def test_rpm(self):
         n = 16
-        rpm_bar_left = [3000]*n + [2000]*n + [2000 + 1000*np.sin(2*np.pi * (k/n)) for k in range(2*n)]
-        rpm_bar_right = [2000]*n + [3000]*n + [2000 + 1000*np.cos(2*np.pi * (k/n)) for k in range(2*n)]
+        rpm_bar_left = [3000]*n + [2000]*n + [2000 + 1000 *
+                                              np.sin(2*np.pi * (k/n)) for k in range(2*n)]
+        rpm_bar_right = [2000]*n + [3000]*n + [2000 + 1000 *
+                                               np.cos(2*np.pi * (k/n)) for k in range(2*n)]
 
         rpm_left = []
         rpm_right = []
@@ -158,7 +159,8 @@ class Control:
 
             print('%i/100' % int(100 * k/(4*n)))
 
-            rpm_l, rpm_r = self.regulation_rpm(rpm_bar_left[k], rpm_bar_right[k])
+            rpm_l, rpm_r = self.regulation_rpm(
+                rpm_bar_left[k], rpm_bar_right[k])
 
             rpm_left.append(rpm_l)
             rpm_right.append(rpm_r)
@@ -181,7 +183,8 @@ class Control:
         print('RPMs saved!')
 
     def follow_psi(self, duration, psi_bar, speed_rpm):  # psi_bar is given in degrees!
-        self.log.write("\nduration: %i ; psi_bar: %s ; spd: %i\n" % (duration, psi_bar, speed_rpm))
+        self.logm.new_mission("Follow PSI - " + "duration: %i ; psi_bar: %s ; spd: %i\n" % (duration,
+                              psi_bar, speed_rpm), ["time", "d_PSI", "rpmL", "rpmR", "rpmLbar", "rpmRbar", "thL", "thR"])
 
         self.reset()
         t0 = time.time()
@@ -192,21 +195,21 @@ class Control:
 
             if self.gpsm.updated:
                 pos_boat = coord_to_pos(coord_boat)
-                x, y = pos_boat.flatten()
-                self.traj.write("%f;%f\n" % (x, y))
+                self.logm.new_GPS_measure(pos_boat,psi,psi_bar)
 
             psi = self.get_current_cap()
             delta_psi = sawtooth(psi_bar * (np.pi / 180) - psi)
             print("CURRENT PSI: ", int(psi * (180 / np.pi)))
 
-            rpm_left_bar, rpm_right_bar = self.leo_cap_and_speed(delta_psi, speed_rpm)
-            rpm_left, rpm_right = self.regulation_rpm(rpm_left_bar, rpm_right_bar)
+            rpm_left_bar, rpm_right_bar = self.leo_cap_and_speed(
+                delta_psi, speed_rpm)
+            rpm_left, rpm_right = self.regulation_rpm(
+                rpm_left_bar, rpm_right_bar)
 
             temp_left, temp_right = self.tpr.read_temp()
-            data = [(t0loop - t0) * 1000, delta_psi * (180 / np.pi), rpm_left, rpm_right,
+            data = [int((t0loop - t0) * 1000), int(delta_psi * (180 / np.pi)), rpm_left, rpm_right,
                     rpm_left_bar, rpm_right_bar, temp_left, temp_right]
-            information = data_to_str(data)
-            self.log.write(information)
+            self.logm.new_measures(data)
 
             # print("Time left: ", self.dt - (time.time() - t0loop))
             while time.time() - t0loop < self.dt:
@@ -216,8 +219,8 @@ class Control:
         self.ard.send_arduino_cmd_motor(0, 0)
 
     def follow_line(self, duration_max, line, speed_rpm):
-        self.log.write("\nduration_max: %i ; a: %s ; b: %s ; spd: %i\n" %
-                       (duration_max, line.name0, line.name1, speed_rpm))
+        self.logm.new_mission("Follow LINE from " + "%s to %s ;duration_max: %i ; spd: %i" %
+                              (duration_max, line.name0, line.name1, speed_rpm), ["time", "d_PSI", "rpmL", "rpmR", "rpmLbar", "rpmRbar", "thL", "thR"])
 
         self.reset()
         psi_bar = line.get_psi()
@@ -239,7 +242,8 @@ class Control:
                 exit_cnt += 1
                 if exit_cnt >= self.exit_attempt_count:
                     if dist <= self.distance_to_buoy:
-                        print('STOP: distance to buoy less than %fm.' % self.distance_to_buoy)
+                        print('STOP: distance to buoy less than %fm.' %
+                              self.distance_to_buoy)
                     else:
                         print('STOP: reach semi-plan.')
                     break
@@ -247,21 +251,24 @@ class Control:
                 exit_cnt = 0
 
             temp = self.line_to_psi_bar(line)
-            psi_bar = temp if temp else psi_bar
+            if temp is not None:
+                psi_bar=temp
+                self.logm.new_GPS_measure(pos_boat, psi, psi_bar)
             # print("PSI BAR: ", psi_bar * (180 / np.pi))
 
             psi = self.get_current_cap()
             delta_psi = sawtooth(psi_bar - psi)
             print("CURRENT PSI: ", int(psi * (180 / np.pi)))
 
-            rpm_left_bar, rpm_right_bar = self.leo_cap_and_speed(delta_psi, speed_rpm)
-            rpm_left, rpm_right = self.regulation_rpm(rpm_left_bar, rpm_right_bar)
+            rpm_left_bar, rpm_right_bar = self.leo_cap_and_speed(
+                delta_psi, speed_rpm)
+            rpm_left, rpm_right = self.regulation_rpm(
+                rpm_left_bar, rpm_right_bar)
 
             temp_left, temp_right = self.tpr.read_temp()
-            data = [(t0loop - t0) * 1000, delta_psi * (180 / np.pi), rpm_left, rpm_right,
+            data = [int((t0loop - t0) * 1000), int(delta_psi * (180 / np.pi)), rpm_left, rpm_right,
                     rpm_left_bar, rpm_right_bar, temp_left, temp_right, pos_boat]
-            information = data_to_str(data)
-            self.log.write(information)
+            self.logm.new_measures(data)
 
             # print("Time left: ", self.dt - (time.time() - t0loop))
             while time.time() - t0loop < self.dt:
@@ -326,7 +333,6 @@ if __name__ == '__main__':
             ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('W'))
             ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('N'))
 
-
         elif mt == 'test_psi':
             d_input = input("Element duration [s]: ")
             d = infinity if d_input == '' else int(d_input)
@@ -345,7 +351,7 @@ if __name__ == '__main__':
         elif mt == 'testRPM':
             ctr.test_rpm()
 
-        else: # psi ici
+        else:  # psi ici
             d_input = input("Mission duration [s]: ")
             d = infinity if d_input == '' else int(d_input)
 
