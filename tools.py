@@ -1,7 +1,6 @@
 import numpy as np
-from gps_driver_v2 import GpsIO
+#from gps_driver_v2 import GpsIO
 
-data_keys = ['time', 'd_psi', 'rpm_l', 'rpm_r', 'rpm_lb', 'rpm_rb', 'th_l', 'th_r']
 
 coordinates = {'ponton': [48.198943, -3.014750],
                'nord': [48.199508, -3.015295],
@@ -12,13 +11,6 @@ coordinates = {'ponton': [48.198943, -3.014750],
 infinity = int(1e6)  # maximum mission duration in seconds
 rho = 110e3  # 6366376  # to check
 I = 63.7 / 180 * np.pi  # earth magnetic field angle
-
-
-def data_to_str(data):
-    str_inf = ""
-    for k, v in zip(data_keys, data):
-        str_inf += k + ': ' + str(int(v)) + ' ; '
-    return str_inf[:-3] + '\n'
 
 
 def cap_to_psi(cap):
@@ -54,28 +46,7 @@ def sawtooth(x):
     return (x + np.pi) % (2 * np.pi) - np.pi
 
 
-def adj(w):
-    wx, wy, wz = w.flatten()
-    return np.array([[0, -wz, wy], [wz, 0, -wx], [-wy, wx, 0]])
-
-
-def expm(M, order=6):
-    acc = np.eye(3)
-    Mk = np.eye(3)
-    scl = 1
-
-    for k in range(1, order+1):
-        Mk = Mk @ M
-        scl = (1/k) * scl
-        acc = acc + scl * Mk
-
-    return acc
-
-
-def expw(w): return expm(adj(w))
-
-
-def rot_uv(u, v):  # returns rotation with minimal angle  such that  v=R*u
+def rot_uv(u, v):  # FROM ROB-LIB : returns rotation with minimal angle such that v=R*u
     u = normalize(u)
     v = normalize(v)
 
@@ -133,13 +104,19 @@ class GpsManager:
         self.gps = GpsIO()
 
         self.coord = coordinates['ponton']
-        self.updated = False
+        self.ready = False
 
     def update_coord(self):
         msg, data = self.gps.read_gll_non_blocking()
         if msg and abs(data[0]) > 1e-3:
             self.coord = convert(data)
-            self.updated = True
+            self.ready = True
+
+    def get_position(self):
+        if self.ready:
+            return coord_to_pos(self.coord)
+        else:
+            return None
 
 
 class Line:
@@ -174,6 +151,34 @@ class Line:
     def get_psi(self):
         fx, fy = self.get_direction().flatten()
         return np.arctan2(-fx, fy)
+
+
+class LogManager:
+    def __init__(self, mission_name):
+        self.log_file = open("log_files/log_%s.txt" % mission_name, 'a+')
+        self.traj_file = open("traj_files/traj_%s.txt" % mission_name, 'a+')
+
+    def new_mission(self, mission, data_names):
+        self.log_file.write("\nNew mission : " + mission)
+        for data_name in data_names:
+            self.log_file.write(data_name + ' ')
+        self.log_file.write('\n')
+
+    def new_measures(self, measures):
+        for measure in measures:
+            self.log_file.write(str(measure) + ' ')
+        self.log_file.write('\n')
+
+    def new_gps_measure(self, pos_boat, psi=None, psi_bar=None):
+        x, y = pos_boat.flatten()
+        if (psi is None) or (psi_bar is None):
+            self.traj_file.write("%f %f\n" % (x, y))
+        else:
+            self.traj_file.write("%f %f %f %f\n" % (x, y, psi, psi_bar))
+
+    def close(self):
+        self.log_file.close()
+        self.traj_file.close()
 
 
 if __name__ == '__main__':

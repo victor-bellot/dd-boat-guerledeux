@@ -15,7 +15,7 @@ if __name__ == "__main__":
     try:
         file_name = sys.argv[1] + '.npy'
     except:
-        file_name = 'data/calibration.npy'
+        file_name = 'calibration.npy'
 
     try:
         n = int(sys.argv[2])
