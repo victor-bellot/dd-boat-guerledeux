@@ -112,10 +112,12 @@ class ArduinoIO:
 
 if __name__ == "__main__":
     ard = ArduinoIO()
+
     try:
         cmdl = int(sys.argv[1])
     except:
         cmdl = 30
+
     try:
         cmdr = int(sys.argv[2])
     except:
