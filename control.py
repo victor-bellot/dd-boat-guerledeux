@@ -27,14 +27,15 @@ class Control:
         self.tpr.set_config(0x0, 0x0)
         self.tpr.set_mode(standby=True, side="both")
 
-        self.cst = {'left': {'kp': 4e-2},  # kp=ki=1e-2
-                    'right': {'kp': 4e-2},  # kp=ki=1e-2
-                    'psi': {'kp': (3/4) / np.pi, 'ki': 1e-2 / np.pi},
+        self.cst = {'left': {'kp': 0.01, 'ki': 0.01},
+                    'right': {'kp': 0.01, 'ki': 0.01},
+                    'psi': {'kp': (3 / 4) / np.pi, 'ki': 1e-2 / np.pi},
                     'line': {'kd': 150, 'kn': 1},
                     }
 
-        self.step_max = 32
-        self.u_max = 128
+        self.step_max = 50
+        self.u_max = 100
+        self.rpm_max = 4000
 
         self.exit_attempt_count = 3  # number of attempt before exiting
         self.distance_to_buoy = 5  # distance in meters from buoy to stop
@@ -337,6 +338,18 @@ if __name__ == '__main__':
 
         elif mt == 'testRPM':
             ctr.test_rpm()
+
+        elif mt == 'test_cmd':
+            for u in range(10, 200, 10):
+                ctr.ard.send_arduino_cmd_motor(u, u)
+                t = 0
+                while t < 3:
+                    rpm_left, rpm_right = ctr.get_rpm()
+                    print(u, rpm_left, rpm_right)
+                    time.sleep(0.05)
+                    t += 0.05
+                print('')
+
 
         else:  # psi ici
             d_input = input("Mission duration [s]: ")
