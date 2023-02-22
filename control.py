@@ -171,7 +171,7 @@ class Control:
             information = data_to_str(data)
             self.log.write(information)
 
-            print("Time left: ", self.dt - (time.time() - t0loop))
+            #print("Time left: ", self.dt - (time.time() - t0loop))
             while time.time() - t0loop < self.dt:
                 self.gpsm.update_coord()
                 time.sleep(1e-3)
@@ -289,7 +289,22 @@ if __name__ == '__main__':
             ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('W'))
             ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('N'))
 
-        else:
+        elif mt == 'test_psi':
+            d_input = input("Element duration [s]: ")
+            d = infinity if d_input == '' else int(d_input)
+
+            p_input = input("Psi bar [°]: ")
+            p = 0.0 if p_input == '' else int(p_input)
+
+            ctr.follow_psi(d, p, 0)
+            ctr.follow_psi(d, p, 500)
+            ctr.follow_psi(d, p, 1000)
+            ctr.follow_psi(d, p, 1500)
+            ctr.follow_psi(d, p, 2000)
+            ctr.follow_psi(d, p, 2500)
+            ctr.follow_psi(d, p, 3000)
+
+        else: #psi
             d_input = input("Mission duration [s]: ")
             d = infinity if d_input == '' else int(d_input)
 
