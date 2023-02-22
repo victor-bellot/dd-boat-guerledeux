@@ -4,6 +4,7 @@ from imu9_driver_v3 import Imu9IO
 from tc74_driver_v2 import TempTC74IO
 from arduino_driver_v2 import ArduinoIO
 from encoders_driver_v2 import EncoderIO
+from kalman import KalmanFilter
 
 
 class Control:
@@ -271,6 +272,67 @@ class Control:
                 time.sleep(1e-3)
 
         self.ard.send_arduino_cmd_motor(0, 0)
+
+    def follow_point(self, duration_max):
+        r, w, phase = 10, 2*np.pi/60, 0
+        x0, y0 = 0, 0
+
+        xd = lambda t: r * np.cos(w*t + phase) + x0
+        yd = lambda t: r * np.sin(w*t - phase) + y0
+
+        dxd = lambda t: -r * w * np.sin(w*t + phase)
+        dyd = lambda t: r * w * np.cos(w*t - phase)
+
+        ddxd = lambda t: -r * w**2 * np.cos(w*t + phase)
+        ddyd = lambda t: -r * w**2 * np.sin(w*t - phase)
+
+        def f(X, u1, u2):
+            x, y, v, theta = X.flatten()
+            return np.array([[v * np.cos(theta)], [v * np.sin(theta)], [u1], [u2]])
+        
+        X = np.array([[r], [0], [1], [np.pi/2]])
+
+        # Kalman filter
+        Xk = X[:3, :]
+        G = np.eye(3) * 100
+        kal = KalmanFilter(Xk, G)
+        kal.C = np.array([[1, 0, 0],
+                          [0, 1, 0]])
+        kal.Galpha = np.array([[0.5, 0, 0], 
+                               [0, 0, 0],
+                               [0, 0, 10]])
+        kal.Gbeta = np.array([[25, 0]
+                              [0, 25]])
+
+        # initialisation
+        self.log.write("\nduration_max: %i ; x0: %s ; y0: %s ; radius: %s\n" %
+                       (duration_max, x0, y0, r))
+        self.reset()
+        t0 = time.time()
+        while (time.time() - t0) < duration_max:
+            t0loop = time.time()
+
+            x, y, v, theta = X.flatten()
+            A = np.array([[np.cos(theta), -v * np.sin(theta)],
+                          [np.sin(theta), v * np.cos(theta)]])
+            err = np.array([[xd(t) - x], [yd(t) - y]])
+            derr = np.array([[dxd(t) - v*np.cos(theta)], [dyd(t) - v*np.sin(theta)]])
+
+            u = np.linalg.inv(A) @ np.array([[xd(t) - x + 2 * (dxd(t) - v*np.cos(theta)) + ddxd(t)], 
+                                             [yd(t) - y + 2 * (dyd(t) - v*np.sin(theta)) + ddyd(t)]])
+            
+            # Kalman filter
+            kal.A = np.array([[1, 0, self.dt * np.cos(theta)], 
+                              [0, 1, self.dt * np.sin(theta)],
+                              [0, 0, 1]])
+            #ak = 
+            kal.u = np.array([[0], [0], [self.dt * ak]])
+
+            # print("Time left: ", self.dt - (time.time() - t0loop))
+            while time.time() - t0loop < self.dt:
+                self.gpsm.update_coord()
+                time.sleep(1e-3)
+
 
 
 if __name__ == '__main__':
