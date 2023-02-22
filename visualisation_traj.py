@@ -38,11 +38,14 @@ if __name__ == '__main__':
     y = []
     vx, vy = [], []
     vxbar, vybar = [], []
-    f = open("traj_files/traj_%s.txt" % mission_name, 'r')
-    for line in f.readlines()[:]:
+    PSI,PSI_BAR = [], []
+    f = open("traj_%s.txt" % mission_name, 'r')
+    for line in f.readlines()[1:]:
         measures = line.split(';')
-        xs, ys, psi, psi_bar = measures if len(
-            measures) == 4 else (measures[0], measures[1], 500, 500)
+        xs, ys, psi, psi_bar = measures if len(measures) == 4 else (measures[0], measures[1], 500, 500)
+        psi, psi_bar = float(psi), float(psi_bar)*np.pi/180
+        PSI.append(psi)
+        PSI_BAR.append(psi_bar)
         x.append(float(xs))
         y.append(float(ys))
 
@@ -50,11 +53,24 @@ if __name__ == '__main__':
         vx.append(float(fx))
         vy.append(float(fy))
 
-        fxbar, fybar = (-np.sin(psi_bar), np.cos(psi_bar)) if psi_bar != 500 else (0, 0)
-        vxbar.append(float(fxbar))
-        vybar.append(float(fybar))
+        fxbar, fybar = (-np.sin(psi_bar),np.cos(psi_bar)) if psi_bar != 500 else (0, 0)
+        vxbar.append(fxbar)
+        vybar.append(fybar)
 
+    plt.title('Trajectoire avec caps')
     plt.scatter(x, y, c=color_map(len(x)))
-    plt.quiver(x, y, vx, vy, color='black', linewidth=1)
-    plt.quiver(x, y, vxbar, vybar, color='red', linewidth=1)
+    plt.quiver(x, y, vx, vy, color='black', scale=50, width=0.002, label='cap reel')
+    plt.quiver(x, y, vxbar, vybar, color='red', scale=50, width=0.002, label='consigne')
+    plt.legend()
+    plt.show()
+
+    plt.title('Erreur de cap')
+    plt.plot(np.array(PSI_BAR)-np.array(PSI),label='erreur de cap')
+    plt.legend()
+    plt.show()
+
+    plt.title('Comparaison consigne_cap/cap_reel')
+    plt.plot(np.array(PSI_BAR), label='consigne')
+    plt.plot(np.array(PSI), label='cap reel')
+    plt.legend()
     plt.show()

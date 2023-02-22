@@ -175,7 +175,7 @@ class Control:
 
             if self.gpsm.ready:
                 pos_boat = coord_to_pos(coord_boat)
-                self.logm.new_GPS_measure(pos_boat,psi,psi_bar)
+                self.logm.new_GPS_measure(pos_boat,psi,psi_bar*np.pi/180)
 
             psi = self.get_current_cap()
             delta_psi = sawtooth(psi_bar * (np.pi / 180) - psi)

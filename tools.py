@@ -1,5 +1,5 @@
 import numpy as np
-from gps_driver_v2 import GpsIO
+#from gps_driver_v2 import GpsIO
 
 data_keys = ['time', 'd_psi', 'rpm_l', 'rpm_r',
              'rpm_lb', 'rpm_rb', 'th_l', 'th_r']
@@ -191,7 +191,7 @@ class LogManager:
         if psi is None:
             self.traj_file.write("%f;%f;%f;%f;\n" % (x, y))
         else:
-            self.traj_file.write("%f;%f;%f;%f;\n" % (x, y, psi, psi_bar))
+            self.traj_file.write("%f;%f;%f;%f\n" % (x, y, psi, psi_bar))
 
     def close(self):
         self.log_file.close()
