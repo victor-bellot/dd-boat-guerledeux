@@ -3,7 +3,7 @@ import numpy as np
 
 
 if __name__ == '__main__':
-    data = np.load('data/test_rpm.npy')
+    data = np.load('data/test_rpm.npy')[:, 0:]
     fig, (ax1, ax2) = plt.subplots(2, 1)
 
     ax1.set_title('Left motor')

@@ -133,13 +133,13 @@ class GpsManager:
         self.gps = GpsIO()
 
         self.coord = coordinates['ponton']
-        self.updated = False
+        self.ready = False
 
     def update_coord(self):
         msg, data = self.gps.read_gll_non_blocking()
         if msg and abs(data[0]) > 1e-3:
             self.coord = convert(data)
-            self.updated = True
+            self.ready = True
 
 
 class Line:
