@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class KalmanFilter():
+class KalmanFilter:
 
     def __init__(self, x0, G0):
         self.x = x0
@@ -9,7 +9,7 @@ class KalmanFilter():
         self.G = G0
         self.lst_x = [self.x]  # list of x
         self.lst_G = [self.G]  # list of Gamma
-        
+
         self.y = 0
         self.C = np.zeros((1, self.m))
         self.Gbeta = np.zeros((1, 1))
@@ -22,7 +22,7 @@ class KalmanFilter():
         C = self.C
         y = self.y
         Gbeta = self.Gbeta
-        
+
         ytilde = y - C @ self.x
         S = C @ self.G @ C.T + Gbeta
         K = self.G @ C.T @ np.linalg.inv(S)
@@ -35,7 +35,7 @@ class KalmanFilter():
         x = self.A @ xk_k + self.B @ self.u
         G = self.A @ Gk_k @ self.A.T + self.Galpha
         return x, G
-    
+
     def instant_state(self, corr=True, pred=True):
         if not (corr or pred):
             print("boolean arguments all false, at least one True is needed")

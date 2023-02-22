@@ -1,10 +1,10 @@
 import time
 from tools import *
+from kalman import KalmanFilter
 from imu9_driver_v3 import Imu9IO
 from tc74_driver_v2 import TempTC74IO
 from arduino_driver_v2 import ArduinoIO
 from encoders_driver_v2 import EncoderIO
-from kalman import KalmanFilter
 
 
 class Control:
@@ -27,7 +27,7 @@ class Control:
         self.tpr.set_mode(standby=True, side="both")
 
         self.cst = {'left': {'kpi': 4e-2}, 'right': {'kpi': 3e-2},
-                    'psi': {'kp': (3 / 4) / np.pi, 'ki': 1e-2 / np.pi},
+                    'psi': {'kp': (3 / 4) / np.pi, 'ki': 1e-2 / np.pi},  # play with kp & ki
                     'line': {'kd': 32, 'kn': 1},
                     }
 
@@ -59,11 +59,9 @@ class Control:
         return self.get_current_cap() * (180 / np.pi)
 
     def line_to_psi_bar(self, line):
-        coord_boat = self.gpsm.coord
+        pos_boat = self.gpsm.get_position()
 
-        if self.gpsm.ready:
-            pos_boat = coord_to_pos(coord_boat)
-
+        if pos_boat is not None:
             kd, kn = self.cst['line']['kd'], self.cst['line']['kn']
             force = get_force(line, pos_boat, kd, kn)
 
@@ -181,7 +179,7 @@ class Control:
             rpm_left, rpm_right = self.regulation_rpm(rpm_left_bar, rpm_right_bar)
 
             temp_left, temp_right = self.tpr.read_temp()
-            data = [int((t0loop - t0) * 1000), int(delta_psi * (180 / np.pi)), rpm_left, rpm_right,
+            data = [(t0loop - t0) * 1000, delta_psi * (180/np.pi), rpm_left, rpm_right,
                     rpm_left_bar, rpm_right_bar, temp_left, temp_right]
             self.lgm.new_measures(data)
 
@@ -242,8 +240,8 @@ class Control:
             rpm_left, rpm_right = self.regulation_rpm(rpm_left_bar, rpm_right_bar)
 
             temp_left, temp_right = self.tpr.read_temp()
-            data = [int((t0loop - t0) * 1000), int(delta_psi * (180 / np.pi)), int(rpm_left), int(rpm_right),
-                    int(rpm_left_bar), int(rpm_right_bar), temp_left, temp_right]
+            data = [(t0loop - t0) * 1000, delta_psi * (180/np.pi), rpm_left, rpm_right,
+                    rpm_left_bar, rpm_right_bar, temp_left, temp_right]
             self.lgm.new_measures(data)
 
             pos_boat = self.gpsm.get_position()
@@ -309,14 +307,13 @@ class Control:
             kal.A = np.array([[1, 0, self.dt * np.cos(theta)], 
                               [0, 1, self.dt * np.sin(theta)],
                               [0, 0, 1]])
-            #ak = 
+            # ak =
             kal.u = np.array([[0], [0], [self.dt * ak]])
 
             # print("Time left: ", self.dt - (time.time() - t0loop))
             while time.time() - t0loop < self.dt:
                 self.gpsm.update_coord()
                 time.sleep(1e-3)
-
 
 
 if __name__ == '__main__':

@@ -174,7 +174,7 @@ class LogManager:
 
     def new_measures(self, measures):
         for measure in measures:
-            self.log_file.write(str(measure) + ' ')
+            self.log_file.write(str(int(measure)) + ' ')
         self.log_file.write('\n')
 
     def new_gps_measure(self, pos_boat, psi=None, psi_bar=None):
