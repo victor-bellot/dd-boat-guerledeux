@@ -11,7 +11,7 @@ if __name__ == '__main__':
     clean3D(ax, size=2)
     draw_axis3D(ax, zoom=1)
 
-    with open('mag_measurements.txt', 'r') as f:
+    with open('test/mag_measurements.txt', 'r') as f:
         while True:
             try:
                 x, y, z = f.readline().split()

@@ -26,7 +26,7 @@ if __name__ == '__main__':
     """
     Scatter trajectories
     """
-    mission_name = 'second'
+    mission_name = 'ultim'
 
     for name, coord in coordinates.items():
         if name != 'plage':

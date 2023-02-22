@@ -112,7 +112,7 @@ def convert(data):
     return ly, lx
 
 
-# coord : spherical ; pos : cartesian
+# coord : spherical (angles in degrees) ; pos : cartesian
 def coord_to_pos(coords, origin='ponton'):
     ly, lx = coords
     lyo, lxo = coordinates[origin]
