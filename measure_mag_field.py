@@ -3,9 +3,9 @@ import time
 
 
 if __name__ == '__main__':
-    f = open('mag_measurements.txt', 'w')
+    f = open('test/mag_measurements.txt', 'w')
     imu = Imu9IO()
-    imu.load_calibration('first.npy')
+    imu.load_calibration('calibration.npy')
 
     try:
         while True:

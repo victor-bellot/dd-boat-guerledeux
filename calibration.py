@@ -15,7 +15,7 @@ if __name__ == "__main__":
     try:
         file_name = sys.argv[1] + '.npy'
     except:
-        file_name = 'calibration.npy'
+        file_name = 'data/calibration.npy'
 
     try:
         n = int(sys.argv[2])
@@ -35,7 +35,7 @@ if __name__ == "__main__":
             save = np.empty((2, 5, 3, 1))
             for i in range(5):
                 label = labels[i]
-                input('Press ENTER to measure (XYZ notation)' + label)
+                input('Press ENTER to measure %s (XYZ notation)' % label)
                 mag_measures = np.zeros((3, n))
                 acc_measures = np.zeros((3, n))
                 for k in range(n):
