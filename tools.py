@@ -1,8 +1,6 @@
 import numpy as np
 from gps_driver_v2 import GpsIO
 
-data_keys = ['time', 'd_psi', 'rpm_l', 'rpm_r',
-             'rpm_lb', 'rpm_rb', 'th_l', 'th_r']
 
 coordinates = {'ponton': [48.198943, -3.014750],
                'nord': [48.199508, -3.015295],
@@ -48,28 +46,7 @@ def sawtooth(x):
     return (x + np.pi) % (2 * np.pi) - np.pi
 
 
-def adj(w):
-    wx, wy, wz = w.flatten()
-    return np.array([[0, -wz, wy], [wz, 0, -wx], [-wy, wx, 0]])
-
-
-def expm(M, order=6):
-    acc = np.eye(3)
-    Mk = np.eye(3)
-    scl = 1
-
-    for k in range(1, order+1):
-        Mk = Mk @ M
-        scl = (1/k) * scl
-        acc = acc + scl * Mk
-
-    return acc
-
-
-def expw(w): return expm(adj(w))
-
-
-def rot_uv(u, v):  # returns rotation with minimal angle  such that  v=R*u
+def rot_uv(u, v):  # FROM ROB-LIB : returns rotation with minimal angle such that v=R*u
     u = normalize(u)
     v = normalize(v)
 
@@ -135,6 +112,12 @@ class GpsManager:
             self.coord = convert(data)
             self.ready = True
 
+    def get_position(self):
+        if self.ready:
+            return coord_to_pos(self.coord)
+        else:
+            return None
+
 
 class Line:
     def __init__(self, name0, name1, coord0=None, coord1=None):
@@ -181,17 +164,17 @@ class LogManager:
             self.log_file.write(data_name + ' ')
         self.log_file.write('\n')
 
-    def new_measures(self, measures,):
+    def new_measures(self, measures):
         for measure in measures:
             self.log_file.write(str(measure) + ' ')
         self.log_file.write('\n')
 
-    def new_GPS_measure(self, pos_boat, psi=None, psi_bar=None):
+    def new_gps_measure(self, pos_boat, psi=None, psi_bar=None):
         x, y = pos_boat.flatten()
-        if psi is None:
-            self.traj_file.write("%f;%f;%f;%f;\n" % (x, y))
+        if (psi is None) or (psi_bar is None):
+            self.traj_file.write("%f %f\n" % (x, y))
         else:
-            self.traj_file.write("%f;%f;%f;%f;\n" % (x, y, psi, psi_bar))
+            self.traj_file.write("%f %f %f %f\n" % (x, y, psi, psi_bar))
 
     def close(self):
         self.log_file.close()

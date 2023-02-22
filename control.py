@@ -15,7 +15,7 @@ class Control:
         self.imu = Imu9IO()
         self.tpr = TempTC74IO()
         self.gpsm = GpsManager()
-        self.logm = LogManager(mission_name)
+        self.lgm = LogManager(mission_name)
 
         self.imu.load_calibration()  # load calibration.npy
 
@@ -25,7 +25,7 @@ class Control:
         self.tpr.set_config(0x0, 0x0)
         self.tpr.set_mode(standby=True, side="both")
 
-        self.cst = {'left': {'kpi': 0.01}, 'right': {'kpi': 0.01},
+        self.cst = {'left': {'kpi': 4e-2}, 'right': {'kpi': 3e-2},
                     'psi': {'kp': (3 / 4) / np.pi, 'ki': 1e-2 / np.pi},
                     'line': {'kd': 1, 'kn': 5},
                     }
@@ -45,7 +45,7 @@ class Control:
 
     def close(self):
         self.ard.send_arduino_cmd_motor(0, 0)
-        self.logm.close()
+        self.lgm.close()
 
     def change_timing(self, dt):
         self.dt = dt
@@ -163,19 +163,14 @@ class Control:
         print('RPMs saved!')
 
     def follow_psi(self, duration, psi_bar, speed_rpm):  # psi_bar is given in degrees!
-        self.logm.new_mission("Follow PSI - " + "duration: %i ; psi_bar: %s ; spd: %i\n" % (duration,
-                              psi_bar, speed_rpm), ["time", "d_PSI", "rpmL", "rpmR", "rpmLbar", "rpmRbar", "thL", "thR"])
+        mission = 'Follow PSI - ' + 'duration: %i ; psi_bar: %s ; spd: %i\n' % (duration, psi_bar, speed_rpm)
+        log_labels = ['time', 'd_PSI', 'rpmL', 'rpmR', 'rpmL_bar', 'rpmR_bar', 'thL', 'thR']
+        self.lgm.new_mission(mission, log_labels)
 
         self.reset()
         t0 = time.time()
         while (time.time() - t0) < duration:
             t0loop = time.time()
-
-            coord_boat = self.gpsm.coord
-
-            if self.gpsm.ready:
-                pos_boat = coord_to_pos(coord_boat)
-                self.logm.new_GPS_measure(pos_boat,psi,psi_bar)
 
             psi = self.get_current_cap()
             delta_psi = sawtooth(psi_bar * (np.pi / 180) - psi)
@@ -187,7 +182,11 @@ class Control:
             temp_left, temp_right = self.tpr.read_temp()
             data = [int((t0loop - t0) * 1000), int(delta_psi * (180 / np.pi)), rpm_left, rpm_right,
                     rpm_left_bar, rpm_right_bar, temp_left, temp_right]
-            self.logm.new_measures(data)
+            self.lgm.new_measures(data)
+
+            pos_boat = self.gpsm.get_position()
+            if pos_boat is not None:  # psi_bar in degrees!
+                self.lgm.new_gps_measure(pos_boat, psi, psi_bar * (np.pi / 180))
 
             # print("Time left: ", self.dt - (time.time() - t0loop))
             while time.time() - t0loop < self.dt:
@@ -197,8 +196,10 @@ class Control:
         self.ard.send_arduino_cmd_motor(0, 0)
 
     def follow_line(self, duration_max, line, speed_rpm):
-        self.logm.new_mission("Follow LINE from " + "%s to %s ;duration_max: %i ; spd: %i" %
-                              (duration_max, line.name0, line.name1, speed_rpm), ["time", "d_PSI", "rpmL", "rpmR", "rpmLbar", "rpmRbar", "thL", "thR"])
+        mission = 'Follow LINE from %s to %s - duration_max: %i ; spd: %i\n' % \
+                  (line.name0, line.name1, duration_max, speed_rpm)
+        log_labels = ['time', 'd_PSI', 'rpmL', 'rpmR', 'rpmL_bar', 'rpmR_bar', 'thL', 'thR']
+        self.lgm.new_mission(mission, log_labels)
 
         self.reset()
         psi_bar = line.get_psi()
@@ -229,9 +230,7 @@ class Control:
                 exit_cnt = 0
 
             temp = self.line_to_psi_bar(line)
-            if temp is not None:
-                psi_bar=temp
-                self.logm.new_GPS_measure(pos_boat, psi, psi_bar)
+            psi_bar = psi_bar if temp is None else temp
             # print("PSI BAR: ", psi_bar * (180 / np.pi))
 
             psi = self.get_current_cap()
@@ -244,7 +243,11 @@ class Control:
             temp_left, temp_right = self.tpr.read_temp()
             data = [int((t0loop - t0) * 1000), int(delta_psi * (180 / np.pi)), rpm_left, rpm_right,
                     rpm_left_bar, rpm_right_bar, temp_left, temp_right, pos_boat]
-            self.logm.new_measures(data)
+            self.lgm.new_measures(data)
+
+            pos_boat = self.gpsm.get_position()
+            if pos_boat is not None:  # psi_bar in radians!
+                self.lgm.new_gps_measure(pos_boat, psi, psi_bar)
 
             # print("Time left: ", self.dt - (time.time() - t0loop))
             while time.time() - t0loop < self.dt:
