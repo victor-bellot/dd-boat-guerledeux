@@ -27,26 +27,22 @@ class Control:
         self.tpr.set_config(0x0, 0x0)
         self.tpr.set_mode(standby=True, side="both")
 
-        self.cst = {'left': {'kp': 0.01, 'ki': 0.01},
-                    'right': {'kp': 0.01, 'ki': 0.01},
+        self.cst = {'left': {'kpi': 0.01}, 'right': {'kpi': 0.01},
                     'psi': {'kp': (3 / 4) / np.pi, 'ki': 1e-2 / np.pi},
-                    'line': {'kd': 150, 'kn': 1},
+                    'line': {'kd': 1, 'kn': 5},
                     }
 
-        self.step_max = 50
-        self.u_max = 100
-        self.rpm_max = 4000
+        self.step_max = 32
+        self.u_max = 128
 
         self.exit_attempt_count = 3  # number of attempt before exiting
         self.distance_to_buoy = 5  # distance in meters from buoy to stop
 
-        self.ei_left, self.ei_right, self.ei_psi = 0, 0, 0
+        self.ei_psi = 0
         self.cmd_left, self.cmd_right = 50, 50
 
-        self.err_old = 0  # speed regulation
-
     def reset(self):
-        self.ei_left, self.ei_right, self.ei_psi = 0, 0, 0
+        self.ei_psi = 0
         self.cmd_left, self.cmd_right = 50, 50
 
     def close(self):
@@ -99,8 +95,8 @@ class Control:
         rpm_left, rpm_right = self.get_rpm()
 
         # proportional to error
-        step_left = self.cst['left']['kp'] * (rpm_left_bar - rpm_left)
-        step_right = self.cst['right']['kp'] * (rpm_right_bar - (-rpm_right))
+        step_left = self.cst['left']['kpi'] * (rpm_left_bar - rpm_left)
+        step_right = self.cst['right']['kpi'] * (rpm_right_bar - (-rpm_right))
 
         # ceil tension variation
         if abs(step_left) > self.step_max:
@@ -130,14 +126,6 @@ class Control:
 
         # print('RPM BAR:', rpm_left_bar, rpm_right_bar)
         return rpm_left_bar, rpm_right_bar
-
-    def regulation_speed(self, v_bar, v):
-        err = v_bar - v
-        d_err = abs(self.err_old - err) / self.dt
-        self.err_old = err
-        add_rpm = self.cst['speed']['kd'] * d_err + self.cst['speed']['kp'] * err
-        return add_rpm
-        # rpm_bar += add_rpm
 
     def test_rpm(self):
         n = 16
@@ -344,12 +332,11 @@ if __name__ == '__main__':
                 ctr.ard.send_arduino_cmd_motor(u, u)
                 t = 0
                 while t < 3:
-                    rpm_left, rpm_right = ctr.get_rpm()
-                    print(u, rpm_left, rpm_right)
+                    rpm_l, rpm_r = ctr.get_rpm()
+                    print(u, rpm_l, rpm_r)
                     time.sleep(0.05)
                     t += 0.05
                 print('')
-
 
         else:  # psi ici
             d_input = input("Mission duration [s]: ")
