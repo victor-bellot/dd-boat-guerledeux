@@ -1,5 +1,5 @@
 import numpy as np
-#from gps_driver_v2 import GpsIO
+from gps_driver_v2 import GpsIO
 
 data_keys = ['time', 'd_psi', 'rpm_l', 'rpm_r',
              'rpm_lb', 'rpm_rb', 'th_l', 'th_r']
