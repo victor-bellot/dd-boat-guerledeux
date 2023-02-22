@@ -27,7 +27,7 @@ class Control:
 
         self.cst = {'left': {'kpi': 4e-2}, 'right': {'kpi': 3e-2},
                     'psi': {'kp': (3 / 4) / np.pi, 'ki': 1e-2 / np.pi},
-                    'line': {'kd': 1, 'kn': 5},
+                    'line': {'kd': 32, 'kn': 1},
                     }
 
         self.step_max = 32
@@ -241,8 +241,8 @@ class Control:
             rpm_left, rpm_right = self.regulation_rpm(rpm_left_bar, rpm_right_bar)
 
             temp_left, temp_right = self.tpr.read_temp()
-            data = [int((t0loop - t0) * 1000), int(delta_psi * (180 / np.pi)), rpm_left, rpm_right,
-                    rpm_left_bar, rpm_right_bar, temp_left, temp_right, pos_boat]
+            data = [int((t0loop - t0) * 1000), int(delta_psi * (180 / np.pi)), int(rpm_left), int(rpm_right),
+                    int(rpm_left_bar), int(rpm_right_bar), temp_left, temp_right]
             self.lgm.new_measures(data)
 
             pos_boat = self.gpsm.get_position()

@@ -1,5 +1,5 @@
 import numpy as np
-#from gps_driver_v2 import GpsIO
+from gps_driver_v2 import GpsIO
 
 
 coordinates = {'ponton': [48.198943, -3.014750],
@@ -9,7 +9,7 @@ coordinates = {'ponton': [48.198943, -3.014750],
                'plage': [48.199807, -3.014803]}
 
 infinity = int(1e6)  # maximum mission duration in seconds
-rho = 110e3  # 6366376  # to check
+rho = 6366376  # 110e3 in degrees to check
 I = 63.7 / 180 * np.pi  # earth magnetic field angle
 
 
@@ -83,12 +83,20 @@ def convert(data):
     return ly, lx
 
 
-# coord : spherical (angles in degrees) ; pos : cartesian
+def degree2radians(iterable):
+    return (x * (np.pi/180) for x in iterable)
+
+
+# coord : spherical (angles in degrees) ; pos : cartesian (in meters)
 def coord_to_pos(coords, origin='ponton'):
-    ly, lx = coords
-    lyo, lxo = coordinates[origin]
-    x = rho * np.cos(ly * (np.pi / 180)) * (lx - lxo)
+    # Convert geographical coordinates into radians
+    ly, lx = degree2radians(coords)
+    lyo, lxo = degree2radians(coordinates[origin])
+
+    # Project sphere on cartesian plan
+    x = rho * np.cos(ly) * (lx - lxo)
     y = rho * (ly - lyo)
+
     return np.array([[x], [y]])
 
 
@@ -144,7 +152,7 @@ class Line:
     def get_normal_toward(self, pos):
         d = self.get_direction()
         m = pos - self.pos0
-        a = np.sum(m * d) * d
+        a = dot(m, d) * d
         n = m - a
         return n / np.linalg.norm(n)
 
