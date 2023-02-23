@@ -26,11 +26,11 @@ if __name__ == '__main__':
     """
     Scatter trajectories
     """
-    mission_name = 'follow'
+    mission_name = 'before'
 
     # plot français_to_english("bouées")
     for name, coord in coordinates.items():
-        if name != 'plage':
+        if name != 'eval':
             xs, ys = coord_to_pos(coord).flatten()
             plt.scatter(xs, ys, c='black')
 
@@ -44,8 +44,8 @@ if __name__ == '__main__':
         measures = line.split()
         xs, ys, psi, psi_bar = measures if len(measures) == 4 else (measures[0], measures[1], 500, 500)
         psi, psi_bar = float(psi), float(psi_bar)
-        PSI.append(psi)
-        PSI_BAR.append(psi_bar)
+        PSI.append(psi * (180/np.pi))
+        PSI_BAR.append(psi_bar * (180/np.pi))
         x.append(float(xs))
         y.append(float(ys))
 
@@ -64,13 +64,13 @@ if __name__ == '__main__':
     plt.legend()
     plt.show()
 
-    plt.title('Heading error in radians')
+    plt.title('Heading error in degrees')
     plt.plot(np.array(PSI_BAR) - np.array(PSI))
     plt.legend()
     plt.show()
 
-    plt.title('Comparaison consigne_cap/cap_reel')
-    plt.plot(np.array(PSI_BAR), label='consigne')
-    plt.plot(np.array(PSI), label='cap reel')
+    plt.title('Heading asked - Heading measured Comparison')
+    plt.plot(np.array(PSI_BAR), label='Asked')
+    plt.plot(np.array(PSI), label='Measured')
     plt.legend()
     plt.show()
