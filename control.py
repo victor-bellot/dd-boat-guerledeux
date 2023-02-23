@@ -1,6 +1,5 @@
 import time
 from tools import *
-from kalman import KalmanFilter
 from imu9_driver_v3 import Imu9IO
 from tc74_driver_v2 import TempTC74IO
 from arduino_driver_v2 import ArduinoIO
@@ -27,7 +26,7 @@ class Control:
         self.tpr.set_mode(standby=True, side="both")
 
         self.cst = {'left': {'kpi': 4e-2}, 'right': {'kpi': 3e-2},
-                    'psi': {'kp': (3 / 4) / np.pi, 'ki': 2e-2 / np.pi},  # play with kp & ki
+                    'psi': {'kp': (3 / 2) / np.pi, 'ki': 3e-2 / np.pi, 'ci': (3/2)*1e-1},  # OK: 3/4 & 3e-2 & 1e-1
                     'line': {'kd': 32, 'kn': 1},
                     }
 
@@ -51,12 +50,6 @@ class Control:
     def change_timing(self, dt):
         self.dt = dt
         self.enc.set_older_value_delay_v2(int(dt * 10))
-
-    def get_current_cap(self):
-        return self.imu.cap()
-
-    def get_current_cap_degree(self):
-        return self.get_current_cap() * (180 / np.pi)
 
     def line_to_psi_bar(self, line):
         pos_boat = self.gpsm.get_position()
@@ -109,8 +102,16 @@ class Control:
 
     def psi_bar_to_rpm_bar(self, delta_psi, rpm_max):
         self.ei_psi += delta_psi * self.dt
-        e_psi = self.cst['psi']['kp'] * delta_psi + \
-            self.cst['psi']['ki'] * self.ei_psi
+
+        kpc = self.cst['psi']['kp'] * delta_psi
+        kic = self.cst['psi']['ki'] * self.ei_psi
+
+        if abs(kic) > self.cst['psi']['ci']:
+            kic = (kic / abs(kic)) * self.cst['psi']['ci']
+
+        e_psi = kpc + kic
+
+        print('kpc: %f ; kip: %f' % (kpc, kic))
 
         if e_psi >= 0:
             rpm_left_bar = rpm_max - e_psi * rpm_max
@@ -122,45 +123,6 @@ class Control:
         # print('RPM BAR:', rpm_left_bar, rpm_right_bar)
         return rpm_left_bar, rpm_right_bar
 
-    def test_rpm(self):
-        n = 16
-        rpm_bar_left = [3000]*n + [2000]*n + [2000 + 1000 *
-                                              np.sin(2*np.pi * (k/n)) for k in range(2*n)]
-        rpm_bar_right = [2000]*n + [3000]*n + [2000 + 1000 *
-                                               np.cos(2*np.pi * (k/n)) for k in range(2*n)]
-
-        rpm_left = []
-        rpm_right = []
-
-        self.reset()
-        for k in range(4*n):
-            t0loop = time.time()
-
-            print('%i/100' % int(100 * k/(4*n)))
-
-            rpm_l, rpm_r = self.regulation_rpm(
-                rpm_bar_left[k], rpm_bar_right[k])
-
-            rpm_left.append(rpm_l)
-            rpm_right.append(rpm_r)
-
-            while time.time() - t0loop < self.dt:
-                time.sleep(1e-3)
-
-        self.ard.send_arduino_cmd_motor(0, 0)
-
-        file_name = 'test/test_rpm.npy'
-        save = np.empty((4, 4*n))
-
-        save[0, :] = rpm_bar_left
-        save[1, :] = rpm_bar_right
-
-        save[2, :] = rpm_left
-        save[3, :] = rpm_right
-
-        np.save(file_name, save)
-        print('RPMs saved!')
-
     def follow_psi(self, duration, psi_bar, speed_rpm):  # psi_bar is given in degrees!
         mission = 'Follow PSI - ' + 'duration: %i ; psi_bar: %s ; spd: %i\n' % (duration, psi_bar, speed_rpm)
         log_labels = ['time', 'd_PSI', 'rpmL', 'rpmR', 'rpmL_bar', 'rpmR_bar', 'thL', 'thR']
@@ -171,7 +133,10 @@ class Control:
         while (time.time() - t0) < duration:
             t0loop = time.time()
 
-            psi = self.get_current_cap()
+            # Update IMU & read current heading
+            self.imu.update()
+            psi = self.imu.cap()
+
             delta_psi = sawtooth(psi_bar * (np.pi / 180) - psi)
             print("CURRENT PSI: ", int(psi * (180 / np.pi)))
 
@@ -179,7 +144,7 @@ class Control:
             rpm_left, rpm_right = self.regulation_rpm(rpm_left_bar, rpm_right_bar)
 
             temp_left, temp_right = self.tpr.read_temp()
-            data = [(t0loop - t0) * 1000, delta_psi * (180/np.pi), rpm_left, rpm_right,
+            data = [(t0loop - t0) * 1000, delta_psi * (180 / np.pi), rpm_left, rpm_right,
                     rpm_left_bar, rpm_right_bar, temp_left, temp_right]
             self.lgm.new_measures(data)
 
@@ -197,7 +162,8 @@ class Control:
     def follow_line(self, duration_max, line, speed_rpm):
         mission = 'Follow LINE from %s to %s - duration_max: %i ; spd: %i\n' % \
                   (line.name0, line.name1, duration_max, speed_rpm)
-        log_labels = ['time', 'd_PSI', 'rpmL', 'rpmR', 'rpmL_bar', 'rpmR_bar', 'thL', 'thR']
+        log_labels = ['time', 'mx', 'my', 'mz', 'ax', 'ay', 'az', 'd_PSI',
+                      'rpmL', 'rpmR', 'rpmL_bar', 'rpmR_bar', 'thL', 'thR']
         self.lgm.new_mission(mission, log_labels)
 
         self.reset()
@@ -220,7 +186,7 @@ class Control:
                 exit_cnt += 1
                 if exit_cnt >= self.exit_attempt_count:
                     if dist <= self.distance_to_buoy:
-                        print('STOP: distance to buoy less than %fm.' %
+                        print('STOP: distance to buoy less than %im.' %
                               self.distance_to_buoy)
                     else:
                         print('STOP: reach semi-plan.')
@@ -232,16 +198,22 @@ class Control:
             psi_bar = psi_bar if temp is None else temp
             # print("PSI BAR: ", psi_bar * (180 / np.pi))
 
-            psi = self.get_current_cap()
+            # Update IMU & read current heading
+            self.imu.update()
+            psi = self.imu.cap()
+
             delta_psi = sawtooth(psi_bar - psi)
-            print("CURRENT PSI: ", int(psi * (180 / np.pi)))
+            # print("CURRENT PSI: ", int(psi * (180 / np.pi)))
 
             rpm_left_bar, rpm_right_bar = self.psi_bar_to_rpm_bar(delta_psi, speed_rpm)
             rpm_left, rpm_right = self.regulation_rpm(rpm_left_bar, rpm_right_bar)
 
             temp_left, temp_right = self.tpr.read_temp()
-            data = [(t0loop - t0) * 1000, delta_psi * (180/np.pi), rpm_left, rpm_right,
-                    rpm_left_bar, rpm_right_bar, temp_left, temp_right]
+            mx, my, mz = self.imu.mag_cor_norm.flatten() * 1e3
+            ax, ay, az = self.imu.acc_cor_norm.flatten() * 1e3
+
+            data = [(t0loop - t0) * 1000, mx, my, mz, ax, ay, az, delta_psi * (180 / np.pi),
+                    rpm_left, rpm_right, rpm_left_bar, rpm_right_bar, temp_left, temp_right]
             self.lgm.new_measures(data)
 
             pos_boat = self.gpsm.get_position()
@@ -254,67 +226,78 @@ class Control:
                 time.sleep(1e-3)
 
         self.ard.send_arduino_cmd_motor(0, 0)
-    
-    def follow_point(self, duration_max):
-        r, w, phase = 10, 2*np.pi/60, 0
-        x0, y0 = 0, 0
 
-        xd = lambda t: r * np.cos(w*t + phase) + x0
-        yd = lambda t: r * np.sin(w*t - phase) + y0
-
-        dxd = lambda t: -r * w * np.sin(w*t + phase)
-        dyd = lambda t: r * w * np.cos(w*t - phase)
-
-        ddxd = lambda t: -r * w**2 * np.cos(w*t + phase)
-        ddyd = lambda t: -r * w**2 * np.sin(w*t - phase)
-
-        def f(X, u1, u2):
-            x, y, v, theta = X.flatten()
-            return np.array([[v * np.cos(theta)], [v * np.sin(theta)], [u1], [u2]])
+    def follow_point(self, duration_max, yd, d_yd, dd_yd):
         
-        X = np.array([[r], [0], [1], [np.pi/2]])
-
         # Kalman filter
-        Xk = X[:3, :]
         G = np.eye(3) * 100
-        kal = KalmanFilter(Xk, G)
+
+        while not self.gpsm.update_coord():
+            time.sleep(1e-3)
+        pos_boat = self.gpsm.get_position()
+
+        x, y = pos_boat.flatten()
+        kal = KalmanFilter(np.array([[x], [y], [0]]), G)
         kal.C = np.array([[1, 0, 0],
                           [0, 1, 0]])
         kal.Galpha = np.array([[0.5, 0, 0], 
-                               [0, 0, 0],
+                               [0, 0.5, 0],
                                [0, 0, 10]])
-        kal.Gbeta = np.array([[25, 0]
+        kal.Gbeta = np.array([[25, 0],
                               [0, 25]])
 
         # initialisation
-        self.log.write("\nduration_max: %i ; x0: %s ; y0: %s ; radius: %s\n" %
-                       (duration_max, x0, y0, r))
+        self.log.write("\nduration_max: %i\n" %
+                       (duration_max))
         self.reset()
         t0 = time.time()
+        t = 0
         while (time.time() - t0) < duration_max:
             t0loop = time.time()
 
-            x, y, v, theta = X.flatten()
-            A = np.array([[np.cos(theta), -v * np.sin(theta)],
-                          [np.sin(theta), v * np.cos(theta)]])
-            err = np.array([[xd(t) - x], [yd(t) - y]])
-            derr = np.array([[dxd(t) - v*np.cos(theta)], [dyd(t) - v*np.sin(theta)]])
 
-            u = np.linalg.inv(A) @ np.array([[xd(t) - x + 2 * (dxd(t) - v*np.cos(theta)) + ddxd(t)], 
-                                             [yd(t) - y + 2 * (dyd(t) - v*np.sin(theta)) + ddyd(t)]])
-            
+            # Update IMU & read current heading
+            self.imu.update()
+            psi = self.imu.cap()
+
             # Kalman filter
-            kal.A = np.array([[1, 0, self.dt * np.cos(theta)], 
-                              [0, 1, self.dt * np.sin(theta)],
+            kal.y = pos_boat
+            kal.A = np.array([[1, 0, self.dt * np.cos(psi)],
+                              [0, 1, self.dt * np.sin(psi)],
                               [0, 0, 1]])
             ak = 0
             kal.u = np.array([[0], [0], [self.dt * ak]])
+            posx, posy, v = kal.instant_state()[0].flatten()
 
+            # controler
+            A = np.array([[np.cos(psi), -v * np.sin(psi)],
+                          [np.sin(psi), v * np.cos(psi)]])
+
+            u = np.linalg.inv(A) @ (yd(t) - np.array([[posx], [posy]]) 
+                                    + 2 * (d_yd(t) - np.array([[v * np.cos(psi)], [v * np.sin(psi)]])) 
+                                    + dd_yd(t))
+
+            rpm_left_bar += u[1, 0] + u[2, 0]
+            rpm_right_bar += u[1, 0] - u[2, 0]
+            rpm_left, rpm_right = self.regulation_rpm(rpm_left_bar, rpm_right_bar)
+
+            # logs
+            temp_left, temp_right = self.tpr.read_temp()
+            data = [(t0loop - t0) * 1000, rpm_left, rpm_right,
+                    rpm_left_bar, rpm_right_bar, temp_left, temp_right]
+            self.lgm.new_measures(data)
+
+            pos_boat = self.gpsm.get_position()
+            self.lgm.new_gps_measure(pos_boat, psi, u[2, 0])
+
+            t += self.dt
             # print("Time left: ", self.dt - (time.time() - t0loop))
             while time.time() - t0loop < self.dt:
                 self.gpsm.update_coord()
                 time.sleep(1e-3)
-    
+
+        self.ard.send_arduino_cmd_motor(0, 0)
+
 
 if __name__ == '__main__':
     print("--- Control program ---\n")
@@ -342,9 +325,10 @@ if __name__ == '__main__':
             d = infinity  # no time limit
             s = 3000  # RPM speed
 
-            line1 = Line('est', 'nord')
-            line2 = Line('nord', 'ouest')
-            line3 = Line('ouest', 'est')
+            line1 = Line('est', 'ouest')
+            line2 = Line('ouest', 'nord')
+            line3 = Line('nord', 'est')
+
             ctr.follow_line(d, line1, speed_rpm=s)
             ctr.follow_line(d, line2, speed_rpm=s)
             ctr.follow_line(d, line3, speed_rpm=s)
@@ -371,36 +355,45 @@ if __name__ == '__main__':
             ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('W'))
             ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('N'))
 
-        elif mt == 'test_psi':
-            d_input = input("Element duration [s]: ")
+        elif mt == 'droite':
+            d_input = input("Mission duration [s]: ")
             d = infinity if d_input == '' else int(d_input)
 
-            p_input = input("Psi bar [°]: ")
-            p = 0.0 if p_input == '' else int(p_input)
+            # ligne droite a partir du ponton vers le nord
+            def yd(t): return np.array([[0 + 0], [t/2 + 0]])
+            def d_yd(t): return np.array([[0], [1]])
+            def dd_yd(t): return np.array([[0], [0]])
+            ctr.follow_point(d, yd, d_yd, dd_yd)
 
-            ctr.follow_psi(d, p, 0)
-            ctr.follow_psi(d, p, 500)
-            ctr.follow_psi(d, p, 1000)
-            ctr.follow_psi(d, p, 1500)
-            ctr.follow_psi(d, p, 2000)
-            ctr.follow_psi(d, p, 2500)
-            ctr.follow_psi(d, p, 3000)
+        elif mt == 'circle':
+            d_input = input("Mission duration [s]: ")
+            d = infinity if d_input == '' else int(d_input)
 
-        elif mt == 'testRPM':
-            ctr.test_rpm()
+            # cercle de center x0, y0 de rayon r, de pulsation w de phase phi
+            c_input = input("Circle center (x0 y0): ")
+            if c_input == '':
+                c = np.array([[10], [10]])
+            else:
+                x0 = int(c_input.split()[0])
+                y0 = int(c_input.split()[1])
+                c = np.array([[x0], [y0]])
 
-        elif mt == 'test_cmd':
-            for u in range(10, 200, 10):
-                ctr.ard.send_arduino_cmd_motor(u, u)
-                t = 0
-                while t < 3:
-                    rpm_l, rpm_r = ctr.get_rpm()
-                    print(u, rpm_l, rpm_r)
-                    time.sleep(0.05)
-                    t += 0.05
-                print('')
+            r_input = input("Mission duration [s]: ")
+            r = 10 if d_input == '' else int(d_input)
 
-        else:  # psi ici
+            w_input = input("Mission duration [s]: ")
+            w = 0.1 if d_input == '' else int(d_input)
+
+            phi_input = input("Mission duration [s]: ")
+            phi = 0 if d_input == '' else int(d_input)
+
+            def yd(t): return c + r * np.array([[np.cos(w*t + phi)], [np.sin(w*t - phi)]])
+            def d_yd(t): return r*w * np.array([[-np.sin(w*t + phi)], [+np.cos(w*t - phi)]])
+            def dd_yd(t): return -r*w**2 * np.array([[np.cos(w*t + phi)], [np.sin(w*t - phi)]])
+            
+            ctr.follow_point(d, yd, d_yd, dd_yd)
+
+        else:  # FOLLOW-PSI ici
             d_input = input("Mission duration [s]: ")
             d = infinity if d_input == '' else int(d_input)
 
