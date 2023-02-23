@@ -1,6 +1,5 @@
 import time
 from tools import *
-from kalman import KalmanFilter
 from imu9_driver_v3 import Imu9IO
 from tc74_driver_v2 import TempTC74IO
 from arduino_driver_v2 import ArduinoIO
