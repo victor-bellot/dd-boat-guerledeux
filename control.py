@@ -369,35 +369,6 @@ if __name__ == '__main__':
             ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('W'))
             ctr.follow_psi(d, speed_rpm=s, psi_bar=cap_to_psi('N'))
 
-        elif mt == 'test_psi':
-            d_input = input("Element duration [s]: ")
-            d = infinity if d_input == '' else int(d_input)
-
-            p_input = input("Psi bar [°]: ")
-            p = 0.0 if p_input == '' else int(p_input)
-
-            ctr.follow_psi(d, p, 0)
-            ctr.follow_psi(d, p, 500)
-            ctr.follow_psi(d, p, 1000)
-            ctr.follow_psi(d, p, 1500)
-            ctr.follow_psi(d, p, 2000)
-            ctr.follow_psi(d, p, 2500)
-            ctr.follow_psi(d, p, 3000)
-
-        elif mt == 'testRPM':
-            ctr.test_rpm()
-
-        elif mt == 'test_cmd':
-            for u in range(10, 200, 10):
-                ctr.ard.send_arduino_cmd_motor(u, u)
-                t = 0
-                while t < 3:
-                    rpm_l, rpm_r = ctr.get_rpm()
-                    print(u, rpm_l, rpm_r)
-                    time.sleep(0.05)
-                    t += 0.05
-                print('')
-
         elif mt == 'droite':
             d_input = input("Mission duration [s]: ")
             d = infinity if d_input == '' else int(d_input)
@@ -436,7 +407,7 @@ if __name__ == '__main__':
             
             ctr.follow_point(d, yd, d_yd, dd_yd)
 
-        else:  # psi ici
+        else:  # FOLLOW-PSI ici
             d_input = input("Mission duration [s]: ")
             d = infinity if d_input == '' else int(d_input)
 
