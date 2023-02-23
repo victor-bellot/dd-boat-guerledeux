@@ -1,7 +1,4 @@
 import time
-
-import numpy as np
-
 from tools import *
 from imu9_driver_v3 import Imu9IO
 from tc74_driver_v2 import TempTC74IO
@@ -29,7 +26,7 @@ class Control:
         self.tpr.set_mode(standby=True, side="both")
 
         self.cst = {'left': {'kpi': 4e-2}, 'right': {'kpi': 3e-2},
-                    'psi': {'kp': (3 / 4) / np.pi, 'ki': 3e-2 / np.pi},  # OK: 3/4 & 3e-2
+                    'psi': {'kp': (3 / 2) / np.pi, 'ki': 3e-2 / np.pi, 'ci': (3/2)*1e-1},  # OK: 3/4 & 3e-2 & 1e-1
                     'line': {'kd': 32, 'kn': 1},
                     }
 
@@ -105,11 +102,16 @@ class Control:
 
     def psi_bar_to_rpm_bar(self, delta_psi, rpm_max):
         self.ei_psi += delta_psi * self.dt
-        e_psi = self.cst['psi']['kp'] * delta_psi + \
-                self.cst['psi']['ki'] * self.ei_psi
 
-        # print('kpc: %f ; kip: %f' % (self.cst['psi']['kp'] * delta_psi,
-        #                              self.cst['psi']['ki'] * self.ei_psi))
+        kpc = self.cst['psi']['kp'] * delta_psi
+        kic = self.cst['psi']['ki'] * self.ei_psi
+
+        if abs(kic) > self.cst['psi']['ci']:
+            kic = (kic / abs(kic)) * self.cst['psi']['ci']
+
+        e_psi = kpc + kic
+
+        print('kpc: %f ; kip: %f' % (kpc, kic))
 
         if e_psi >= 0:
             rpm_left_bar = rpm_max - e_psi * rpm_max
@@ -184,7 +186,7 @@ class Control:
                 exit_cnt += 1
                 if exit_cnt >= self.exit_attempt_count:
                     if dist <= self.distance_to_buoy:
-                        print('STOP: distance to buoy less than %fm.' %
+                        print('STOP: distance to buoy less than %im.' %
                               self.distance_to_buoy)
                     else:
                         print('STOP: reach semi-plan.')
@@ -230,8 +232,8 @@ class Control:
         center = np.array([[20], [0]])
 
         def yd(t): return center + r * np.array([[np.cos(w*t + phi)], [np.sin(w*t - phi)]])
-        def yd_p(t): return r*w * np.array([[-np.sin(w*t + phi)], [+np.cos(w*t - phi)]])
-        def yd_pp(t): return -r*w**2 * np.array([[np.cos(w*t + phi)], [np.sin(w*t - phi)]])
+        def d_yd(t): return r*w * np.array([[-np.sin(w*t + phi)], [+np.cos(w*t - phi)]])
+        def dd_yd(t): return -r*w**2 * np.array([[np.cos(w*t + phi)], [np.sin(w*t - phi)]])
 
         def f(ste, u1, u2):
             x, y, v, psi = ste.flatten()
@@ -264,7 +266,7 @@ class Control:
             A = np.array([[np.cos(psi), -v * np.sin(psi)],
                           [np.sin(psi), v * np.cos(psi)]])
 
-            u = np.linalg.inv(A) @ ((yd(t) - y) + 2 * (yd_p(t) - yp) + yd_pp(t))
+            u = np.linalg.inv(A) @ ((yd(t) - y) + 2 * (d_yd(t) - yp) + dd_yd(t))
             
             # Kalman filter
             coord_boat = self.gpsm.coord

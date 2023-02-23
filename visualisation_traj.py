@@ -26,12 +26,13 @@ if __name__ == '__main__':
     """
     Scatter trajectories
     """
-    mission_name = 'evaline'
+    mission_name = 're'
 
     # plot français_to_english("bouées")
     for name, coord in coordinates.items():
-        xs, ys = coord_to_pos(coord).flatten()
-        plt.scatter(xs, ys, c='black')
+        if name != 'eval':
+            xs, ys = coord_to_pos(coord).flatten()
+            plt.scatter(xs, ys, c='black')
 
     x = []
     y = []

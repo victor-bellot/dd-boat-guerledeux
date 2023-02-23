@@ -2,7 +2,7 @@ import numpy as np
 from gps_driver_v2 import GpsIO
 
 
-coordinates = {'ponton': [48.199028, -3.014778],
+coordinates = {'ponton': [48.198943, -3.014750],
                'nord': [48.199508, -3.015295],
                'ouest': [48.199184, -3.015283],
                'est': [48.199202, -3.015000],
@@ -151,6 +151,7 @@ class GpsManager:
         if msg and abs(data[0]) > 1e-3:
             self.coord = convert(data)
             self.ready = True
+        return self.ready
 
     def get_position(self):
         if self.ready:
