@@ -253,68 +253,67 @@ class Control:
 
         self.ard.send_arduino_cmd_motor(0, 0)
 
-    def follow_point(self, duration_max):
-        r, w, phase = 10, 2*np.pi/60, 0
-        x0, y0 = 20, 0
-
-        xd = lambda t: r * np.cos(w*t + phase) + x0
-        yd = lambda t: r * np.sin(w*t - phase) + y0
-
-        dxd = lambda t: -r * w * np.sin(w*t + phase)
-        dyd = lambda t: r * w * np.cos(w*t - phase)
-
-        ddxd = lambda t: -r * w**2 * np.cos(w*t + phase)
-        ddyd = lambda t: -r * w**2 * np.sin(w*t - phase)
-
-        def f(X, u1, u2):
-            x, y, v, psi = X.flatten()
-            return np.array([[v * np.cos(psi)], [v * np.sin(psi)], [u1], [u2]])
-        
-        X = np.array([[r], [0], [1], [np.pi/2]])
+    def follow_point(self, duration_max, yd, d_yd, dd_yd):
 
         # Kalman filter
-        Xk = X[:3, :]
         G = np.eye(3) * 100
-        kal = KalmanFilter(Xk, G)
+
+        while not self.gpsm.update_coord():
+            time.sleep(1e-3)
+        pos_boat = self.gpsm.get_position()
+
+        x, y = pos_boat.flatten()
+        kal = KalmanFilter(np.array([[x], [y], [0]]), G)
         kal.C = np.array([[1, 0, 0],
                           [0, 1, 0]])
         kal.Galpha = np.array([[0.5, 0, 0], 
-                               [0, 0, 0],
+                               [0, 0.5, 0],
                                [0, 0, 10]])
         kal.Gbeta = np.array([[25, 0]
                               [0, 25]])
 
         # initialisation
-        self.log.write("\nduration_max: %i ; x0: %s ; y0: %s ; radius: %s\n" %
-                       (duration_max, x0, y0, r))
+        self.log.write("\nduration_max: %i\n" %
+                       (duration_max))
         self.reset()
         t0 = time.time()
+        t = 0
         while (time.time() - t0) < duration_max:
             t0loop = time.time()
 
-            x, y, v, psi = X.flatten()
-            
-            A = np.array([[np.cos(psi), -v * np.sin(psi)],
-                          [np.sin(psi), v * np.cos(psi)]])
+            psi = self.get_current_cap()
 
-            u = np.linalg.inv(A) @ np.array([[xd(t) - x + 2 * (dxd(t) - v*np.cos(psi)) + ddxd(t)], 
-                                             [yd(t) - y + 2 * (dyd(t) - v*np.sin(psi)) + ddyd(t)]])
-            
             # Kalman filter
-            coord_boat = self.gpsm.coord
-            pos_boat = coord_to_pos(coord_boat)
             kal.y = pos_boat
             kal.A = np.array([[1, 0, self.dt * np.cos(psi)], 
                               [0, 1, self.dt * np.sin(psi)],
                               [0, 0, 1]])
             ak = 0
             kal.u = np.array([[0], [0], [self.dt * ak]])
+            posx, posy, v = kal.instant_state()[0].flatten()
 
-            X[:3, 0] = kal.instant_state()
-            X[-1, 0] = self.get_current_cap()
+            # controler
+            A = np.array([[np.cos(psi), -v * np.sin(psi)],
+                          [np.sin(psi), v * np.cos(psi)]])
 
+            u = np.linalg.inv(A) @ (yd(t) - np.array([[posx], [posy]]) 
+                                    + 2 * (d_yd(t) - np.array([[v * np.cos(psi)], [v * np.sin(psi)]])) 
+                                    + dd_yd(t))
 
+            rpm_left_bar += u[1, 0] + u[2, 0]
+            rpm_right_bar += u[1, 0] - u[2, 0]
+            rpm_left, rpm_right = self.regulation_rpm(rpm_left_bar, rpm_right_bar)
 
+            # logs
+            temp_left, temp_right = self.tpr.read_temp()
+            data = [(t0loop - t0) * 1000, rpm_left, rpm_right,
+                    rpm_left_bar, rpm_right_bar, temp_left, temp_right]
+            self.lgm.new_measures(data)
+
+            pos_boat = self.gpsm.get_position()
+            self.lgm.new_gps_measure(pos_boat, psi, u[2, 0])
+
+            t += self.dt
             # print("Time left: ", self.dt - (time.time() - t0loop))
             while time.time() - t0loop < self.dt:
                 self.gpsm.update_coord()
@@ -406,6 +405,44 @@ if __name__ == '__main__':
                     time.sleep(0.05)
                     t += 0.05
                 print('')
+
+        elif mt == 'droite':
+            d_input = input("Mission duration [s]: ")
+            d = infinity if d_input == '' else int(d_input)
+
+            # ligne droite a partir du ponton vers le nord
+            def yd(t): return np.array([[0 + 0], [t/2 + 0]])
+            def d_yd(t): return np.array([[0], [1]])
+            def dd_yd(t): return np.array([[0], [0]])
+            ctr.follow_point(d, yd, d_yd, dd_yd)
+
+        elif mt == 'circle':
+            d_input = input("Mission duration [s]: ")
+            d = infinity if d_input == '' else int(d_input)
+
+            # cercle de center x0, y0 de rayon r, de pulsation w de phase phi
+            c_input = input("Circle center (x0 y0): ")
+            if c_input == '':
+                c = np.array([[10], [10]])
+            else:
+                x0 = int(c_input.split()[0])
+                y0 = int(c_input.split()[1])
+                c = np.array([[x0], [y0]])
+
+            r_input = input("Mission duration [s]: ")
+            r = 10 if d_input == '' else int(d_input)
+
+            w_input = input("Mission duration [s]: ")
+            w = 0.1 if d_input == '' else int(d_input)
+
+            phi_input = input("Mission duration [s]: ")
+            phi = 0 if d_input == '' else int(d_input)
+
+            def yd(t): return c + r * np.array([[np.cos(w*t + phi)], [np.sin(w*t - phi)]])
+            def d_yd(t): return r*w * np.array([[-np.sin(w*t + phi)], [+np.cos(w*t - phi)]])
+            def dd_yd(t): return -r*w**2 * np.array([[np.cos(w*t + phi)], [np.sin(w*t - phi)]])
+            
+            ctr.follow_point(d, yd, d_yd, dd_yd)
 
         else:  # psi ici
             d_input = input("Mission duration [s]: ")
