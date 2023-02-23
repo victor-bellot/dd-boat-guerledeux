@@ -12,6 +12,13 @@ class Imu9IO:
         self.trans_mag = {'A_1': np.eye(3), 'b': np.zeros(shape=(3, 1))}
         self.trans_acc = {'A_1': np.eye(3), 'b': np.zeros(shape=(3, 1))}
 
+        # Current corrected & normalized magnetic field & acceleration
+        self.mag_cor_norm = None
+        self.acc_cor_norm = None
+
+        # Current boat euler angles
+        self.euler_angles = None
+
         self.__bus_nb = 1  # 1 on DDBoat, 2 on DartV2
         self.__addr_mg = 0x1e  # mag sensor
         self.__addr_ag = 0x6b  # accelero - gyro
@@ -143,25 +150,29 @@ class Imu9IO:
             i = i - (1 << 16)
         return i        
 
-    def correction_mag(self):
+    def compute_mag(self):
         x = self.read_mag_raw()
         y = self.trans_mag['A_1'] @ (x + self.trans_mag['b'])
-        return y
+        self.mag_cor_norm = normalize(y)
 
-    def correction_acc(self):
+    def compute_acc(self):
         lst_acc = []
         for _ in range(32):
             lst_acc.append(self.read_accel_raw())
         x = np.median(np.array(lst_acc), axis=0)
         
         y = self.trans_acc['A_1'] @ (x + self.trans_acc['b'])
-        return y
+        self.acc_cor_norm = normalize(y)
 
-    def get_euler_angles(self):
+    def update(self):
+        self.compute_mag()
+        self.compute_acc()
+        self.compute_euler_angles()
+
+    def compute_euler_angles(self):
         grav = np.array([[0], [0], [-1]])
-
-        a1 = normalize(self.correction_acc())
-        y1 = normalize(self.correction_mag())
+        y1 = self.mag_cor_norm
+        a1 = self.acc_cor_norm
 
         phi = np.arcsin(a1[1, 0])
         theta = np.arcsin(a1[0, 0])
@@ -171,10 +182,10 @@ class Imu9IO:
         mhx, mhy, mhz = (Rh @ y1).flatten()
         psi = -np.arctan2(mhy, mhx)
 
-        return np.array([phi, theta, psi]).T
+        self.euler_angles = np.array([phi, theta, psi]).T
 
     def cap(self):
-        return self.get_euler_angles()[2]
+        return self.euler_angles[2]
 
 
 if __name__ == "__main__":

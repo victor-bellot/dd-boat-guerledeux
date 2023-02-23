@@ -6,7 +6,7 @@ coordinates = {'ponton': [48.198943, -3.014750],
                'nord': [48.199508, -3.015295],
                'ouest': [48.199184, -3.015283],
                'est': [48.199202, -3.015000],
-               'plage': [48.199807, -3.014803]}
+               'eval': [48.1994, -3.0166]}
 
 infinity = int(1e6)  # maximum mission duration in seconds
 rho = 6366376  # 110e3 in degrees to check
@@ -107,6 +107,38 @@ def get_force(line, pos, kd, kn):
     return force
 
 
+""" KALMAN notation
+0 index refers to k|k-1
+up index refers to k|k
+1 index refers to k+1|k
+
+Solve for :
+x0 = x_true + N(Γx)
+x1 = A @ x0 + u + N(Γα)
+y = C @ x0 + N(Γβ) """
+
+
+def kalman_prediction(xup, Γup, u, Γα, A):
+    Γ1 = A @ Γup @ A.T + Γα
+    x1 = A @ xup + u
+    return x1, Γ1
+
+
+def kalman_correction(x0, Γ0, y, Γβ, C):
+    S = C @ Γ0 @ C.T + Γβ
+    K = Γ0 @ C.T @ np.linalg.inv(S)
+    ytilde = y - C @ x0
+    Gup = (np.eye(len(x0)) - K @ C) @ Γ0
+    xup = x0 + K @ ytilde
+    return xup, Gup
+
+
+def kalman(x0, Γ0, u, y, Γα, Γβ, A, C):
+    xup, Γup = kalman_correction(x0, Γ0, y, Γβ, C)
+    x1, Γ1 = kalman_prediction(xup, Γup, u, Γα, A)
+    return x1, Γ1
+
+
 class GpsManager:
     def __init__(self):
         self.gps = GpsIO()
@@ -119,6 +151,7 @@ class GpsManager:
         if msg and abs(data[0]) > 1e-3:
             self.coord = convert(data)
             self.ready = True
+        return self.ready
 
     def get_position(self):
         if self.ready:
@@ -189,7 +222,7 @@ class LogManager:
         self.traj_file.close()
 
 
-class KalmanFilter():
+class KalmanFilter:
 
     def __init__(self, x0, G0):
         self.x = x0
