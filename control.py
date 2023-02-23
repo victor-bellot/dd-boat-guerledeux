@@ -229,8 +229,6 @@ class Control:
 
     def follow_point(self, duration_max, yd, d_yd, dd_yd):
         
-        X = np.array([[r], [0], [1], [np.pi/2]])
-
         # Kalman filter
         G = np.eye(3) * 100
 
