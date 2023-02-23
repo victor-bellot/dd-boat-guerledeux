@@ -19,14 +19,14 @@ interpolation = interp1d(ks, haxby, axis=0)
 # -> map [0; 1[ to rgb color in [0; 1[
 
 
-def color_map(n): return [interpolation(k/n) for k in range(n)]
+def color_map(n): return [interpolation(k / n) for k in range(n)]
 
 
 if __name__ == '__main__':
     """
     Scatter trajectories
     """
-    mission_name = 'test'
+    mission_name = 'follow'
 
     # plot français_to_english("bouées")
     for name, coord in coordinates.items():
@@ -38,12 +38,12 @@ if __name__ == '__main__':
     y = []
     vx, vy = [], []
     vxbar, vybar = [], []
-    PSI,PSI_BAR = [], []
-    f = open("traj_%s.txt" % mission_name, 'r')
+    PSI, PSI_BAR = [], []
+    f = open("traj_files/traj_%s.txt" % mission_name, 'r')
     for line in f.readlines()[1:]:
-        measures = line.split(';')
+        measures = line.split()
         xs, ys, psi, psi_bar = measures if len(measures) == 4 else (measures[0], measures[1], 500, 500)
-        psi, psi_bar = float(psi), float(psi_bar)*np.pi/180
+        psi, psi_bar = float(psi), float(psi_bar)
         PSI.append(psi)
         PSI_BAR.append(psi_bar)
         x.append(float(xs))
@@ -53,7 +53,7 @@ if __name__ == '__main__':
         vx.append(float(fx))
         vy.append(float(fy))
 
-        fxbar, fybar = (-np.sin(psi_bar),np.cos(psi_bar)) if psi_bar != 500 else (0, 0)
+        fxbar, fybar = (-np.sin(psi_bar), np.cos(psi_bar)) if psi_bar != 500 else (0, 0)
         vxbar.append(fxbar)
         vybar.append(fybar)
 
@@ -64,8 +64,8 @@ if __name__ == '__main__':
     plt.legend()
     plt.show()
 
-    plt.title('Erreur de cap')
-    plt.plot(np.array(PSI_BAR)-np.array(PSI),label='erreur de cap')
+    plt.title('Heading error in radians')
+    plt.plot(np.array(PSI_BAR) - np.array(PSI))
     plt.legend()
     plt.show()
 

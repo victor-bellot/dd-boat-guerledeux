@@ -5,7 +5,7 @@ from tools import coordinates, rho, coord_to_pos, get_force, Line, normalize
 control_cst = {'left': {'kp': 0.01, 'ki': 0.01},
                'right': {'kp': 0.01, 'ki': 0.01},
                'phi': {'kp': (3 / 4) / np.pi, 'ki': 1e-2 / np.pi},
-               'line': {'kd': 150, 'kn': 1},
+               'line': {'kd': 50, 'kn': 1},
                }
 
 # Fonction qui renvoie le cap à suivre pour un point donné
@@ -39,7 +39,7 @@ def line_to_force(pos_boat, line):
 
 
 # What is my ligne
-a = "ponton"  # (ponton, nord, ouest, est, plage) = ")
+a = "nord"  # (ponton, nord, ouest, est, plage) = ")
 b = "ouest"
 my_line = Line(a, b)
 
