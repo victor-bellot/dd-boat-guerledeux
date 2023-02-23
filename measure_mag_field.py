@@ -4,7 +4,7 @@ import time
 
 if __name__ == '__main__':
 
-    f = open('test/mag_measurements.txt', 'w')
+    f = open('data/mag_measurements.txt', 'w')
     imu = Imu9IO()
     imu.load_calibration('calibration.npy')
 

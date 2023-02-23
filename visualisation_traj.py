@@ -26,7 +26,7 @@ if __name__ == '__main__':
     """
     Scatter trajectories
     """
-    mission_name = 'test'
+    mission_name = 'follow'
 
     # plot français_to_english("bouées")
     for name, coord in coordinates.items():
@@ -39,11 +39,12 @@ if __name__ == '__main__':
     vx, vy = [], []
     vxbar, vybar = [], []
     PSI,PSI_BAR = [], []
-    f = open("traj_%s.txt" % mission_name, 'r')
+    f = open("traj_files/traj_%s.txt" % mission_name, 'r')
     for line in f.readlines()[1:]:
-        measures = line.split(';')
+        measures = line.split(' ')
+        print(measures)
         xs, ys, psi, psi_bar = measures if len(measures) == 4 else (measures[0], measures[1], 500, 500)
-        psi, psi_bar = float(psi), float(psi_bar)*np.pi/180
+        psi, psi_bar = float(psi), float(psi_bar)
         PSI.append(psi)
         PSI_BAR.append(psi_bar)
         x.append(float(xs))
