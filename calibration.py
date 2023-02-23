@@ -27,7 +27,8 @@ if __name__ == "__main__":
     if n < 0:
         imu.load_calibration(file_name)
         while True:
-            print(imu.get_euler_angles() * (180 / np.pi))
+            imu.update()
+            print(imu.euler_angles * (180 / np.pi))
             time.sleep(0.2)
 
     else:

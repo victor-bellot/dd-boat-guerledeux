@@ -221,7 +221,7 @@ class LogManager:
         self.traj_file.close()
 
 
-class KalmanFilter():
+class KalmanFilter:
 
     def __init__(self, x0, G0):
         self.x = x0

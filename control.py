@@ -1,4 +1,7 @@
 import time
+
+import numpy as np
+
 from tools import *
 from imu9_driver_v3 import Imu9IO
 from tc74_driver_v2 import TempTC74IO
@@ -204,8 +207,8 @@ class Control:
             rpm_left, rpm_right = self.regulation_rpm(rpm_left_bar, rpm_right_bar)
 
             temp_left, temp_right = self.tpr.read_temp()
-            mx, my, mz = self.imu.mag_cor_norm.flatten()
-            ax, ay, az = self.imu.acc_cor_norm.flatten()
+            mx, my, mz = self.imu.mag_cor_norm.flatten() * 1e3
+            ax, ay, az = self.imu.acc_cor_norm.flatten() * 1e3
 
             data = [(t0loop - t0) * 1000, mx, my, mz, ax, ay, az, delta_psi * (180 / np.pi),
                     rpm_left, rpm_right, rpm_left_bar, rpm_right_bar, temp_left, temp_right]
@@ -222,27 +225,22 @@ class Control:
 
         self.ard.send_arduino_cmd_motor(0, 0)
 
-    def follow_point(self, duration_max):
-        r, w, phase = 10, 2*np.pi/60, 0
-        x0, y0 = 20, 0
+    def follow_point(self, duration_max, phi):
+        r, w = 10, 2*np.pi/60
+        center = np.array([[20], [0]])
 
-        xd = lambda t: r * np.cos(w*t + phase) + x0
-        yd = lambda t: r * np.sin(w*t - phase) + y0
+        def yd(t): return center + r * np.array([[np.cos(w*t + phi)], [np.sin(w*t - phi)]])
+        def yd_p(t): return r*w * np.array([[-np.sin(w*t + phi)], [+np.cos(w*t - phi)]])
+        def yd_pp(t): return -r*w**2 * np.array([[np.cos(w*t + phi)], [np.sin(w*t - phi)]])
 
-        dxd = lambda t: -r * w * np.sin(w*t + phase)
-        dyd = lambda t: r * w * np.cos(w*t - phase)
-
-        ddxd = lambda t: -r * w**2 * np.cos(w*t + phase)
-        ddyd = lambda t: -r * w**2 * np.sin(w*t - phase)
-
-        def f(X, u1, u2):
-            x, y, v, psi = X.flatten()
+        def f(ste, u1, u2):
+            x, y, v, psi = ste.flatten()
             return np.array([[v * np.cos(psi)], [v * np.sin(psi)], [u1], [u2]])
         
-        X = np.array([[r], [0], [1], [np.pi/2]])
+        state = np.array([[r], [0], [1], [np.pi/2]])  # x y v psi
 
         # Kalman filter
-        Xk = X[:3, :]
+        Xk = state[:3, :]
         G = np.eye(3) * 100
         kal = KalmanFilter(Xk, G)
         kal.C = np.array([[1, 0, 0],
@@ -250,7 +248,7 @@ class Control:
         kal.Galpha = np.array([[0.5, 0, 0], 
                                [0, 0, 0],
                                [0, 0, 10]])
-        kal.Gbeta = np.array([[25, 0]
+        kal.Gbeta = np.array([[25, 0],
                               [0, 25]])
 
         self.reset()
@@ -258,13 +256,15 @@ class Control:
         while (time.time() - t0) < duration_max:
             t0loop = time.time()
 
-            x, y, v, psi = X.flatten()
+            v, psi = state[2:4].flatten()
+
+            y = state[:2]
+            yp = f(state, 0, 0)[2:]  # u doesn't matter!
 
             A = np.array([[np.cos(psi), -v * np.sin(psi)],
                           [np.sin(psi), v * np.cos(psi)]])
 
-            u = np.linalg.inv(A) @ np.array([[xd(t) - x + 2 * (dxd(t) - v*np.cos(psi)) + ddxd(t)],
-                                             [yd(t) - y + 2 * (dyd(t) - v*np.sin(psi)) + ddyd(t)]])
+            u = np.linalg.inv(A) @ ((yd(t) - y) + 2 * (yd_p(t) - yp) + yd_pp(t))
             
             # Kalman filter
             coord_boat = self.gpsm.coord
@@ -276,10 +276,8 @@ class Control:
             ak = 0
             kal.u = np.array([[0], [0], [self.dt * ak]])
 
-            X[:3, 0] = kal.instant_state()
-            X[-1, 0] = self.get_current_cap()
-
-
+            state[:3, 0] = kal.instant_state()
+            state[-1, 0] = self.get_current_cap()
 
             # print("Time left: ", self.dt - (time.time() - t0loop))
             while time.time() - t0loop < self.dt:

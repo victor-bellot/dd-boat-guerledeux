@@ -26,18 +26,17 @@ if __name__ == '__main__':
     """
     Scatter trajectories
     """
-    mission_name = 'before'
+    mission_name = 'evaline'
 
     # plot français_to_english("bouées")
     for name, coord in coordinates.items():
-        if name != 'eval':
-            xs, ys = coord_to_pos(coord).flatten()
-            plt.scatter(xs, ys, c='black')
+        xs, ys = coord_to_pos(coord).flatten()
+        plt.scatter(xs, ys, c='black')
 
     x = []
     y = []
     vx, vy = [], []
-    vxbar, vybar = [], []
+    vx_bar, vy_bar = [], []
     PSI, PSI_BAR = [], []
     f = open("traj_files/traj_%s.txt" % mission_name, 'r')
     for line in f.readlines()[1:]:
@@ -53,14 +52,22 @@ if __name__ == '__main__':
         vx.append(float(fx))
         vy.append(float(fy))
 
-        fxbar, fybar = (-np.sin(psi_bar), np.cos(psi_bar)) if psi_bar != 500 else (0, 0)
-        vxbar.append(fxbar)
-        vybar.append(fybar)
+        fx_bar, fy_bar = (-np.sin(psi_bar), np.cos(psi_bar)) if psi_bar != 500 else (0, 0)
+        vx_bar.append(fx_bar)
+        vy_bar.append(fy_bar)
+
+    step = 6
+    x = x[::step]
+    y = y[::step]
+    vx = vx[::step]
+    vy = vy[::step]
+    vx_bar = vx_bar[::step]
+    vy_bar = vy_bar[::step]
 
     plt.title('Trajectoire avec caps')
     plt.scatter(x, y, c=color_map(len(x)))
     plt.quiver(x, y, vx, vy, color='black', scale=50, width=0.002, label='cap reel')
-    plt.quiver(x, y, vxbar, vybar, color='red', scale=50, width=0.002, label='consigne')
+    plt.quiver(x, y, vx_bar, vy_bar, color='red', scale=50, width=0.002, label='consigne')
     plt.legend()
     plt.show()
 
