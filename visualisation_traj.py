@@ -26,7 +26,7 @@ if __name__ == '__main__':
     """
     Scatter trajectories
     """
-    mission_name = 're'
+    mission_name = 'circle'
 
     # plot français_to_english("bouées")
     for name, coord in coordinates.items():
@@ -65,10 +65,10 @@ if __name__ == '__main__':
     vx_bar = vx_bar[::step]
     vy_bar = vy_bar[::step]
 
-    plt.title('Trajectoire avec caps')
+    plt.title('Trajectories')
     plt.scatter(x, y, c=color_map(len(x)))
-    plt.quiver(x, y, vx, vy, color='black', scale=50, width=0.002, label='cap reel')
-    plt.quiver(x, y, vx_bar, vy_bar, color='red', scale=50, width=0.002, label='consigne')
+    plt.quiver(x, y, vx, vy, color='black', scale=50, width=0.002, label='Measured heading')
+    plt.quiver(x, y, vx_bar, vy_bar, color='red', scale=50, width=0.002, label='Asked heading')
     plt.legend()
     plt.show()
 
