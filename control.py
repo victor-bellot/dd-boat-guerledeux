@@ -227,7 +227,7 @@ class Control:
 
         self.ard.send_arduino_cmd_motor(0, 0)
 
-    def follow_point(self, duration_max):
+    def follow_point(self, duration_max, yd, d_yd, dd_yd):
         
         X = np.array([[r], [0], [1], [np.pi/2]])
 
