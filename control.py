@@ -228,21 +228,6 @@ class Control:
         self.ard.send_arduino_cmd_motor(0, 0)
 
     def follow_point(self, duration_max):
-        r, w, phase = 10, 2*np.pi/60, 0
-        x0, y0 = 20, 0
-
-        xd = lambda t: r * np.cos(w*t + phase) + x0
-        yd = lambda t: r * np.sin(w*t - phase) + y0
-
-        dxd = lambda t: -r * w * np.sin(w*t + phase)
-        dyd = lambda t: r * w * np.cos(w*t - phase)
-
-        ddxd = lambda t: -r * w**2 * np.cos(w*t + phase)
-        ddyd = lambda t: -r * w**2 * np.sin(w*t - phase)
-
-        def f(X, u1, u2):
-            x, y, v, psi = X.flatten()
-            return np.array([[v * np.cos(psi)], [v * np.sin(psi)], [u1], [u2]])
         
         X = np.array([[r], [0], [1], [np.pi/2]])
 
@@ -272,7 +257,10 @@ class Control:
         while (time.time() - t0) < duration_max:
             t0loop = time.time()
 
-            psi = self.get_current_cap()
+
+            # Update IMU & read current heading
+            self.imu.update()
+            psi = self.imu.cap()
 
             # Kalman filter
             kal.y = pos_boat
