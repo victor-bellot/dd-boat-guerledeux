@@ -4,8 +4,6 @@ from imu9_driver_v3 import Imu9IO
 from tc74_driver_v2 import TempTC74IO
 from arduino_driver_v2 import ArduinoIO
 from encoders_driver_v2 import EncoderIO
-from kalman import KalmanFilter
-
 
 class Control:
     def __init__(self, mission_name, dt=0.5):
@@ -259,7 +257,7 @@ class Control:
 
     def follow_point(self, duration_max):
         r, w, phase = 10, 2*np.pi/60, 0
-        x0, y0 = 0, 0
+        x0, y0 = 20, 0
 
         xd = lambda t: r * np.cos(w*t + phase) + x0
         yd = lambda t: r * np.sin(w*t - phase) + y0
@@ -271,8 +269,8 @@ class Control:
         ddyd = lambda t: -r * w**2 * np.sin(w*t - phase)
 
         def f(X, u1, u2):
-            x, y, v, theta = X.flatten()
-            return np.array([[v * np.cos(theta)], [v * np.sin(theta)], [u1], [u2]])
+            x, y, v, psi = X.flatten()
+            return np.array([[v * np.cos(psi)], [v * np.sin(psi)], [u1], [u2]])
         
         X = np.array([[r], [0], [1], [np.pi/2]])
 
@@ -296,26 +294,35 @@ class Control:
         while (time.time() - t0) < duration_max:
             t0loop = time.time()
 
-            x, y, v, theta = X.flatten()
-            A = np.array([[np.cos(theta), -v * np.sin(theta)],
-                          [np.sin(theta), v * np.cos(theta)]])
-            err = np.array([[xd(t) - x], [yd(t) - y]])
-            derr = np.array([[dxd(t) - v*np.cos(theta)], [dyd(t) - v*np.sin(theta)]])
+            x, y, v, psi = X.flatten()
+            
+            A = np.array([[np.cos(psi), -v * np.sin(psi)],
+                          [np.sin(psi), v * np.cos(psi)]])
 
-            u = np.linalg.inv(A) @ np.array([[xd(t) - x + 2 * (dxd(t) - v*np.cos(theta)) + ddxd(t)], 
-                                             [yd(t) - y + 2 * (dyd(t) - v*np.sin(theta)) + ddyd(t)]])
+            u = np.linalg.inv(A) @ np.array([[xd(t) - x + 2 * (dxd(t) - v*np.cos(psi)) + ddxd(t)], 
+                                             [yd(t) - y + 2 * (dyd(t) - v*np.sin(psi)) + ddyd(t)]])
             
             # Kalman filter
-            kal.A = np.array([[1, 0, self.dt * np.cos(theta)], 
-                              [0, 1, self.dt * np.sin(theta)],
+            coord_boat = self.gpsm.coord
+            pos_boat = coord_to_pos(coord_boat)
+            kal.y = pos_boat
+            kal.A = np.array([[1, 0, self.dt * np.cos(psi)], 
+                              [0, 1, self.dt * np.sin(psi)],
                               [0, 0, 1]])
-            #ak = 
+            ak = 0
             kal.u = np.array([[0], [0], [self.dt * ak]])
+
+            X[:3, 0] = kal.instant_state()
+            X[-1, 0] = self.get_current_cap()
+
+
 
             # print("Time left: ", self.dt - (time.time() - t0loop))
             while time.time() - t0loop < self.dt:
                 self.gpsm.update_coord()
                 time.sleep(1e-3)
+                
+        self.ard.send_arduino_cmd_motor(0, 0)
 
 
 
