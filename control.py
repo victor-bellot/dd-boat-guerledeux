@@ -5,10 +5,6 @@ from imu9_driver_v3 import Imu9IO
 from tc74_driver_v2 import TempTC74IO
 from arduino_driver_v2 import ArduinoIO
 from encoders_driver_v2 import EncoderIO
-<<<<<<< HEAD
-=======
-
->>>>>>> 837ed03ce883e816d527984e63374bc99f24c20e
 
 class Control:
     def __init__(self, mission_name, dt=0.5):
@@ -312,11 +308,7 @@ class Control:
             kal.A = np.array([[1, 0, self.dt * np.cos(psi)], 
                               [0, 1, self.dt * np.sin(psi)],
                               [0, 0, 1]])
-<<<<<<< HEAD
             ak = 0
-=======
-            # ak =
->>>>>>> 837ed03ce883e816d527984e63374bc99f24c20e
             kal.u = np.array([[0], [0], [self.dt * ak]])
 
             X[:3, 0] = kal.instant_state()
