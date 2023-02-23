@@ -27,7 +27,7 @@ class Control:
         self.tpr.set_mode(standby=True, side="both")
 
         self.cst = {'left': {'kpi': 4e-2}, 'right': {'kpi': 3e-2},
-                    'psi': {'kp': (3 / 4) / np.pi, 'ki': 1e-2 / np.pi},  # play with kp & ki
+                    'psi': {'kp': (3 / 4) / np.pi, 'ki': 2e-2 / np.pi},  # play with kp & ki
                     'line': {'kd': 32, 'kn': 1},
                     }
 
@@ -254,7 +254,7 @@ class Control:
                 time.sleep(1e-3)
 
         self.ard.send_arduino_cmd_motor(0, 0)
-
+    
     def follow_point(self, duration_max):
         r, w, phase = 10, 2*np.pi/60, 0
         x0, y0 = 0, 0
@@ -307,14 +307,14 @@ class Control:
             kal.A = np.array([[1, 0, self.dt * np.cos(theta)], 
                               [0, 1, self.dt * np.sin(theta)],
                               [0, 0, 1]])
-            # ak =
+            ak = 0
             kal.u = np.array([[0], [0], [self.dt * ak]])
 
             # print("Time left: ", self.dt - (time.time() - t0loop))
             while time.time() - t0loop < self.dt:
                 self.gpsm.update_coord()
                 time.sleep(1e-3)
-
+    
 
 if __name__ == '__main__':
     print("--- Control program ---\n")

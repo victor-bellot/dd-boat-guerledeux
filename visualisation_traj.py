@@ -26,7 +26,7 @@ if __name__ == '__main__':
     """
     Scatter trajectories
     """
-    mission_name = 'follow'
+    mission_name = 're'
 
     # plot français_to_english("bouées")
     for name, coord in coordinates.items():
@@ -64,13 +64,17 @@ if __name__ == '__main__':
     plt.legend()
     plt.show()
 
-    plt.title('Heading error in radians')
-    plt.plot(np.array(PSI_BAR) - np.array(PSI))
-    plt.legend()
-    plt.show()
+    err=False
+    if err:
+        plt.title('Heading error in radians')
+        plt.plot(np.array(PSI_BAR) - np.array(PSI))
+        plt.legend()
+        plt.show()
 
-    plt.title('Comparaison consigne_cap/cap_reel')
-    plt.plot(np.array(PSI_BAR), label='consigne')
-    plt.plot(np.array(PSI), label='cap reel')
-    plt.legend()
-    plt.show()
+    compa=True
+    if compa:
+        plt.title('Comparaison consigne_cap/cap_reel')
+        plt.plot(np.array(PSI_BAR), label='consigne')
+        plt.plot(np.array(PSI), label='cap reel')
+        plt.legend()
+        plt.show()
