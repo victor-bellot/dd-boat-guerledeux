@@ -33,8 +33,14 @@ class Control:
         self.u_step = 32
         self.u_max = 128
 
-        self.rpm_step = 100
+        self.rpm_step = 500
         self.rpm_max = 4000
+
+        self.ke0 = 1e2
+        self.ke1 = 2
+
+        self.scale_cmd_dv = 1
+        self.scale_cmd_dp = 2e-2
 
         self.exit_attempt_count = 3  # number of attempt before exiting
         self.distance_to_buoy = 5  # distance in meters from buoy to stop
@@ -287,21 +293,22 @@ class Control:
             y = np.array([[x_hat], [y_hat]])
             d_y = np.array([[v_hat * np.cos(psi)], [v_hat * np.sin(psi)]])
 
-            alpha = beta = 1  # play on that as well
-            error = alpha * (yd(t) - y) + 2 * beta * (d_yd(t) - d_y) + dd_yd(t)
+            error = self.ke0 * (yd(t) - y) + self.ke1 * (d_yd(t) - d_y) + dd_yd(t)
             u_dv, u_dp = (np.linalg.inv(A) @ error).flatten()
 
             # ADD scale before ceiling
-            u_dv = ceil(u_dv, self.rpm_step)
-            u_dp = ceil(u_dp, self.rpm_step)
+            u_dv = ceil(u_dv * self.scale_cmd_dv, self.rpm_step)
+            u_dp = ceil(u_dp * self.scale_cmd_dp, self.rpm_step)
             # -> play on rpm_step
             # carry negative speed will (wheel!)
 
             print('error:', error)
-            print('INTENTION - spd: %f ; head: %f' % (u_dv, u_dp))
+            print('INTENTION - dv: %f ; dp: %f' % (u_dv, u_dp))
 
             rpm_left_bar = max(0, min(rpm_left_bar + (u_dv + u_dp), self.rpm_max))
             rpm_right_bar = max(0, min(rpm_right_bar + (u_dv - u_dp), self.rpm_max))
+
+            print('RPMs asked', rpm_left_bar, rpm_right_bar)
 
             rpm_left, rpm_right = self.regulation_rpm(rpm_left_bar, rpm_right_bar)
 
