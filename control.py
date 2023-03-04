@@ -1,3 +1,11 @@
+"""
+control.py
+
+Main program for planning mission & managing IO
+Link sensors, motors & user commands
+"""
+
+
 import time
 from tools import *
 from imu9_driver_v3 import Imu9IO
@@ -8,7 +16,7 @@ from encoders_driver_v2 import EncoderIO
 
 class Control:
     def __init__(self, mission_name, dt=0.5):
-        self.mission_name = mission_name
+        self.mission_name = mission_name  # useful for logging
 
         self.ard = ArduinoIO()
         self.enc = EncoderIO()
@@ -30,12 +38,14 @@ class Control:
                     'line': {'kd': 32, 'kn': 1},
                     }
 
+        # RPM regulation constants
         self.u_step = 32
         self.u_max = 128
 
         self.rpm_step = 500
         self.rpm_max = 4000
 
+        # Follow point constants
         self.ke0 = 1e2
         self.ke1 = 2
 
@@ -49,10 +59,12 @@ class Control:
         self.cmd_left, self.cmd_right = 50, 50
 
     def reset(self):
+        # Prepare for a new mission
         self.ei_psi = 0
         self.cmd_left, self.cmd_right = 50, 50
 
     def close(self):
+        # End robot session
         self.ard.send_arduino_cmd_motor(0, 0)
         self.lgm.close()
 
@@ -61,6 +73,9 @@ class Control:
         self.enc.set_older_value_delay_v2(int(dt * 10))
 
     def line_to_psi_bar(self, line):
+        """
+        Compute the heading to follow 'line'
+        """
         pos_boat = self.gpsm.get_position()
 
         if pos_boat is not None:
@@ -88,6 +103,9 @@ class Control:
         return rpm_left, rpm_right
 
     def regulation_rpm(self, rpm_left_bar, rpm_right_bar):
+        """
+        Regulate motor tension to make propellers turn at a given speed
+        """
         rpm_left, rpm_right = self.get_rpm()
 
         # proportional to error
@@ -108,6 +126,9 @@ class Control:
         return rpm_left, rpm_right
 
     def psi_bar_to_rpm_bar(self, delta_psi, rpm_max):
+        """
+        Decide how to control motor's speed in order to have delta_psi -> 0
+        """
         self.ei_psi += delta_psi * self.dt
 
         kpc = self.cst['psi']['kp'] * delta_psi
@@ -130,6 +151,13 @@ class Control:
         return rpm_left_bar, rpm_right_bar
 
     def follow_psi(self, duration, psi_bar, speed_rpm):  # psi_bar is given in degrees!
+        """
+        Follow cap mission function
+        Chose mission 'duration', cap to follow 'psi_bar' and nominal motor speed 'speed_rpm'
+        Motor information as well as GNSS coordinate for recorded during the mission into log files
+        Trajectory decision are taken by the 'psi_bar_to_rpm_bar' method
+        """
+
         mission = 'Follow PSI - ' + 'duration: %i ; psi_bar: %s ; spd: %i\n' % (duration, psi_bar, speed_rpm)
         log_labels = ['time', 'd_PSI', 'rpmL', 'rpmR', 'rpmL_bar', 'rpmR_bar', 'thL', 'thR']
         self.lgm.new_mission(mission, log_labels)
@@ -166,6 +194,14 @@ class Control:
         self.ard.send_arduino_cmd_motor(0, 0)
 
     def follow_line(self, duration_max, line, speed_rpm):
+        """
+        Follow line mission function
+        Chose mission max duration, 'line' to follow and nominal motor speed 'speed_rpm'
+        Motor information as well as GNSS coordinate for recorded during the mission into log files
+        Trajectory decision are taken by the 'line_to_psi_bar' method
+        -> it uses a force vector field approach
+        """
+
         mission = 'Follow LINE from %s to %s - duration_max: %i ; spd: %i\n' % \
                   (line.name0, line.name1, duration_max, speed_rpm)
         log_labels = ['time', 'mx', 'my', 'mz', 'ax', 'ay', 'az', 'd_PSI',
@@ -234,6 +270,14 @@ class Control:
         self.ard.send_arduino_cmd_motor(0, 0)
 
     def follow_point(self, duration_max, yd, d_yd, dd_yd):
+        """
+        Follow point mission function
+        Chose mission max duration & a trajectory to follow (2 times derivative)
+        Motor information as well as GNSS coordinate for recorded during the mission into log files
+        A Kalman filter estimates boat speed
+        A controller compute heading speed & boat acceleration intentions to follow the given trajectory
+        """
+
         # Initialize logs
         mission = 'Follow POINT - duration_max: %i\n' % (duration_max,)
         log_labels = ['time', 'psi', 'rpmL', 'rpmR', 'rpmL_bar', 'rpmR_bar', 'thL', 'thR']
@@ -332,6 +376,10 @@ class Control:
 
 
 if __name__ == '__main__':
+    """
+    Manage user interface
+    """
+
     print("--- Control program ---\n")
 
     mn = input("Mission name: ")

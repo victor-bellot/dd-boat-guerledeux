@@ -1,14 +1,20 @@
+"""
+calibration.py
+
+2 modes:
+- calibration : ask for measure of magnetic field and acceleration
+    for different boat orientation -> generate a calibration file
+- calibration monitor : print euler angles compute from a given
+    calibration file
+"""
+
+
 import sys
 import time
 import numpy as np
 from imu9_driver_v3 import Imu9IO
 
 labels = ['NWU', 'SWD', 'WSU', 'UEN', 'NUE']
-
-
-def get_time():
-    lt = time.localtime()
-    return "%i-%i-%i-%i" % (lt.tm_mday, lt.tm_hour, lt.tm_min, lt.tm_sec)
 
 
 if __name__ == "__main__":

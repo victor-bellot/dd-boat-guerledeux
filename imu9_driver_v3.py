@@ -9,6 +9,7 @@ import i2creal as i2c  # currently only real I2C on ddboats (no simulated I2C)
 
 class Imu9IO:
     def __init__(self):
+        # Current calibration transformation of this IMU object
         self.trans_mag = {'A_1': np.eye(3), 'b': np.zeros(shape=(3, 1))}
         self.trans_acc = {'A_1': np.eye(3), 'b': np.zeros(shape=(3, 1))}
 
@@ -72,6 +73,11 @@ class Imu9IO:
         self.__dev_i2c_ag.write(0x12, [0x04])
 
     def load_calibration(self, calibration_file_name='calibration.npy'):
+        """
+        Update trans_mag & trans_acc calibration transformation
+        dictionary from a calibration file
+        """
+
         measurements = np.load(calibration_file_name)
 
         # COMPASS
@@ -151,11 +157,13 @@ class Imu9IO:
         return i        
 
     def compute_mag(self):
+        # Update current magnetic field
         x = self.read_mag_raw()
         y = self.trans_mag['A_1'] @ (x + self.trans_mag['b'])
         self.mag_cor_norm = normalize(y)
 
     def compute_acc(self):
+        # Update current acceleration -> median filter on 32 measures
         lst_acc = []
         for _ in range(32):
             lst_acc.append(self.read_accel_raw())
@@ -165,11 +173,16 @@ class Imu9IO:
         self.acc_cor_norm = normalize(y)
 
     def update(self):
+        # Update measures & estimated euler angles
         self.compute_mag()
         self.compute_acc()
         self.compute_euler_angles()
 
     def compute_euler_angles(self):
+        """
+        From corrected & normalized measures of magnetic field & acceleration
+        compute the current orientation of this IMU expressed with euler angles
+        """
         grav = np.array([[0], [0], [-1]])
         y1 = self.mag_cor_norm
         a1 = self.acc_cor_norm
@@ -185,6 +198,7 @@ class Imu9IO:
         self.euler_angles = np.array([phi, theta, psi]).T
 
     def cap(self):
+        # Return the third euler angle -> heading
         return self.euler_angles[2]
 
 

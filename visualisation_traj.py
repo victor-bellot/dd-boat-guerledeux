@@ -1,3 +1,10 @@
+"""
+visualisation_traj.py
+
+Plot a mission trajectory as well as robot estimated heading & desired heading
+"""
+
+
 from scipy.interpolate import interp1d
 from matplotlib import pyplot as plt
 from tools import *

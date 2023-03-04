@@ -8,6 +8,7 @@ control_cst = {'left': {'kp': 0.01, 'ki': 0.01},
                'line': {'kd': 32, 'kn': 1},
                }
 
+
 # Fonction qui renvoie le cap à suivre pour un point donné
 def line_to_psi_bar(pos_boat, line):
     kd, kn = control_cst['line']['kd'], control_cst['line']['kn']
@@ -76,4 +77,4 @@ plt.plot(x0, x1, '*r', lw=25)
 plt.plot(y0, y1, '*b', lw=25)
 plt.plot(np.array([x0, y0]), np.array([x1, y1]), 'orange')
 
-#plt.show()
+# plt.show()

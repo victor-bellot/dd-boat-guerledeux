@@ -1,3 +1,16 @@
+"""
+tools.py
+
+Here are defined useful constants & functions for the Control class
+We have GNSS position of interest geographical points
+Mathematical functions & operators
+Projection of GNSS coordinates into a local referential
+Description of follow line force vector field
+Kalman filter prediction & correction steps
+Classes for managing Lines, GPS & Logs
+"""
+
+
 import numpy as np
 from gps_driver_v2 import GpsIO
 
