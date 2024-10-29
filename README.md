@@ -2,8 +2,8 @@
 
 ## Authors (ROB 24 ENSTA BRETAGNE students)
 
-- BELLOT Victor
-- BERNARD Léo
+- BELLOT Victor (Jules156)
+- BERNARD Léo (leooooooooooooooooooooooooo)
 - ROUSSEL Étienne
 
 ## Python programs of interests
